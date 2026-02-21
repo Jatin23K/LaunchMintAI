@@ -1,0 +1,994 @@
+the app must contain
+
+
+1) High-level purpose & success criteria
+
+Purpose: A “Founder Intelligence Platform” — an AI-first web app that helps founders research, validate, plan, and execute startup decisions (competition, GTM, roadmap, fundraising, hiring, finance) via extensions described earlier.
+
+Primary user personas: early-stage founders, product managers, growth leads, investor-facing founders.
+
+MVP success criteria (must pass all):
+
+User can upload or enter a startup idea and get a coherent Competitor DeepDive + Business Model summary in <1 meaningful session.
+
+Roadmap Generator produces prioritized features and a downloadable roadmap.
+
+Document Intelligence ingests a PDF/deck and produces accurate summarized insights (≥90% key-point capture in QA tests).
+
+System reliably integrates at least 4 core extensions (Competitor, People, Business Model, Roadmap, Document Intelligence).
+
+Basic authentication, secure data handling, and audit logs in place.
+
+2) Core user flows (end-to-end)
+
+I’ll list primary flows — each must be wireframed and tested.
+
+Signup / Onboarding
+
+Email/password + OAuth (GitHub, Google).
+
+Optional: SSO for premium accounts later.
+
+Onboarding wizard that captures: company stage, vertical, core product description, target user, funding status.
+
+Create Project / Workspace
+
+Workspace metadata (name, team, industry tags, privacy).
+
+Upload assets: PDFs, decks, CSVs, images, links.
+
+Connectors: GitHub (repo), Notion, Google Drive (Phase 2).
+
+Run Extension (single or multi)
+
+User chooses extension (Competitor DeepDive, Document Intelligence, etc.) and gives input (URL, file, text prompt).
+
+System processes, returns a structured report with sections, tables, visuals, and action items.
+
+User can request follow-up queries, refinement, or export.
+
+Decision Simulator
+
+Choose scenario (e.g., raise seed vs continue bootstrapped).
+
+Input variables + run simulation.
+
+Visual outputs: outcome probabilities, sensitivity analysis, recommended next steps.
+
+Collaboration / Team
+
+Invite team members, set roles (owner, editor, viewer).
+
+Comments on reports, tasks, notifications.
+
+Export / Share
+
+Download PDF/PowerPoint/CSV/Excel.
+
+Shareable link with view-only or comment access.
+
+Integration with Slack/Email for push.
+
+Settings / Billing
+
+Billing portal (stripe), plan upgrade, usage dashboard.
+
+3) UI / UX (must be crisp — investors judge this first)
+
+Design principles: fast, minimal, professional, dark-mode-first (you wanted google-dark-futuristic). Prioritize clarity and trust.
+
+Main screens/components
+
+Dashboard (projects, recent reports, quick actions)
+
+Project workspace (file list, run-extension buttons)
+
+Extension run modal / full-screen (input form, params)
+
+Report viewer (TOC, interactive charts, raw data, “explain this” per section)
+
+Roadmap visualizer (kanban + timeline + export)
+
+Decision simulator UI (sliders for variables, toggles)
+
+Collaborator pane (comments, change history)
+
+Admin/Billing
+
+UX details
+
+Live progress bar + step logs for long jobs (OCR, web scrapes).
+
+“Confidence” badges on AI outputs with source links (important for trust).
+
+Inline edit for generated text and ability to re-run only parts of workflow.
+
+Keyboard shortcuts for power users.
+
+Accessibility: keyboard nav, alt texts, high contrast.
+
+Design assets
+
+Component library (React + Tailwind recommended), iconography, font system, color tokens, spacing scale.
+
+4) Data model (core entities)
+
+Minimal normalized schema to start.
+
+User {id, name, email, hashed_password, oauth_ids, role, plan, created_at}
+
+Workspace {id, owner_id, name, privacy, industry_tags, created_at}
+
+Project {id, workspace_id, title, description, stage, created_at}
+
+Asset {id, project_id, type[file/url/text], original_name, storage_path, ocr_text, meta}
+
+ExtensionRun {id, project_id, extension_type, input_payload, status, started_at, finished_at, cost_meta}
+
+Report {id, extension_run_id, title, structured_json, html_render, attachments}
+
+TeamMember {id, workspace_id, user_id, role}
+
+AuditLog {id, user_id, action, target_id, timestamp}
+
+ModelCallLog {id, run_id, model, prompt_hash, tokens_in, tokens_out, cost}
+
+Design for multi-tenant separation and field-level encryption for sensitive data (PII, financials).
+
+5) Backend architecture & components
+
+Keep it modular and observable.
+
+Recommended stack
+
+Backend framework: Node.js (NestJS) or Python (FastAPI). Use TypeScript if Node.
+
+Datastore: PostgreSQL (primary), Redis (cache, job queue), S3-compatible storage for files.
+
+Search & embeddings: OpenSearch / Elastic or vector DB (Milvus, Weaviate, or Pinecone).
+
+ML / LLM infra: Calls to cloud LLM APIs (OpenAI/GWEN/Anthropic/etc.), local LLM serving optional for privacy (Phase 2).
+
+Worker queue: Celery/RQ/BullMQ for async processing (OCR, scraping, long LLM jobs).
+
+OCR: PaddleOCR pipeline (you prefer it) running in workers or serverless GPUs.
+
+Scraping: headless browser pool (Playwright) with rate limit and IP rotation via proxies.
+
+Embedding pipeline: create embeddings for docs, snippets, competitor snapshots.
+
+Containerization: Docker + Kubernetes (K8s) for production scaling.
+
+Microservices
+
+API Gateway (auth, routing)
+
+Extensions service (pluggable handlers per extension)
+
+Document ingestion service (OCR, parsing)
+
+Embedding & search service
+
+Job orchestration service (saga pattern for multi-step runs)
+
+Billing service (Stripe integration)
+
+Notifications service (email/Slack/webhook)
+
+Why microservices? Because each extension has different resource needs and scaling patterns.
+
+6) LLM/AI design & prompts
+
+This is where most teams fail.
+
+Strategy
+
+Use a layered approach: retrieval-augmented generation (RAG) + tool-augmented LLMs.
+
+Store source snippets + metadata; always attach provenance to claims.
+
+Break complex tasks into small sub-prompts; validate outputs against rules & heuristics.
+
+Use system prompts that enforce tone and structure (e.g., “Produce a 3-section output: Summary, Evidence, Actions”).
+
+Keep a prompt versioning table (so outputs are repeatable & auditable).
+
+Model plan
+
+MVP: Use 1–2 high-quality APIs for reasoning (e.g., GPT-4o style model or equivalent) + embeddings from a fast, cheaper model.
+
+Phase 2: Add local LLM fallback for privacy-sensitive work (fine-tuned smaller LLMs).
+
+Cost control: set max tokens, use short prompts + streaming for large outputs.
+
+Validation
+
+Build a “validator agent” for each extension that checks outputs vs. rules (e.g., competitor list must include X if Y exists).
+
+For Document Intelligence: run extraction + compare to source via F1 metrics.
+
+7) Integrations & connectors (must-have)
+
+MVP connectors
+
+Web: URL ingestion & scraping engine
+
+File: PDF/PowerPoint/CSV upload
+
+Email: send-to-project (Phase 1 basic SMTP)
+
+OAuth: Google Drive, GitHub (optional for early MVP)
+
+Phase 2 / high priority
+
+Notion, Slack, Figma, Calendly, LinkedIn scraping (compliance needed), Google Sheets
+
+APIs
+
+Public API for programmatic runs (rate-limited)
+
+Webhooks for job completion
+
+8) Security, privacy & compliance (non-negotiable)
+
+You will get burned by ignoring these.
+
+Security
+
+TLS everywhere (HTTPS)
+
+JWT or OAuth-secured APIs; refresh tokens
+
+Encrypted at rest for sensitive fields (Postgres pgcrypto, or field-level encryption)
+
+Role-based access control (RBAC) + audit logs
+
+Rate limiting & abuse detection
+
+CSP + secure headers
+
+Privacy
+
+Allow workspace-level data deletion and export (GDPR right to be forgotten)
+
+Data residency options (Phase 2)
+
+Explicit consent screens for scraping third-party profiles
+
+Compliance
+
+Privacy policy, TOS, DMCA takedown flow
+
+If processing EU data: GDPR readiness
+
+If you handle financial or health data: additional controls (avoid processing until compliant)
+
+9) Observability & monitoring
+
+You’ll regret not instrumenting this.
+
+Metrics: Prometheus + Grafana for system metrics
+
+Tracing: OpenTelemetry for request tracing across services
+
+Logs: Centralized logging (ELK / Loki)
+
+Alerting: Threshold-based alerts (job failures, high latency), on-call rotations (PagerDuty)
+
+Usage & cost dashboards for LLM calls (tokens, cost per run)
+
+SLOs & SLAs: define for each critical path (e.g., 99% of small jobs < 30s)
+
+10) Infra & deployment
+
+Environment layout
+
+Dev, Staging, Prod
+
+IaC: Terraform + Helm charts for K8s
+
+CI/CD: GitHub Actions/GitLab CI for builds, tests, image push, deployment
+
+Blue/Green or Canary deployments for safe rollouts
+
+Scaling
+
+Autoscale workers based on queue depth
+
+Scale vector DB separately from main DB
+
+Cost-control on GPU resources (preemptible instances for batch OCR/embedding jobs)
+
+11) Cost model & throttling
+
+LLM costs will dominate. Build controls:
+
+Soft vs hard quotas per plan
+
+Token limits per run and per workspace
+
+Batch jobs scheduled off-peak for heavy processing
+
+Use cheaper embeddings and cheaper LLMs for retrieval-only tasks
+
+12) Testing strategy
+
+Automated tests
+
+Unit tests for each service
+
+Integration tests for extension end-to-end
+
+Contract tests for service boundaries (Pact)
+
+E2E tests (Cypress) for critical flows
+
+AI-specific tests
+
+Golden-tests: snapshot outputs for key prompts (prompt versioning)
+
+Ground-truth datasets for evaluation (Document Intelligence: precision/recall)
+
+Fuzz testing for input sanitation (malicious PDFs, extremely large documents)
+
+Acceptance tests
+
+Functional acceptance criteria per extension (e.g., Competitor DeepDive finds top-5 competitors for a known company).
+
+13) Data governance & retraining
+
+Label outputs and store feedback loops for supervised improvement (user upvotes/downvotes).
+
+Build a dataset of human-reviewed runs to fine-tune future models (privacy-consented).
+
+Periodic model audits for hallucination rates and bias.
+
+14) Operational playbook (what ops must do daily/weekly)
+
+Daily: Process queue backlog, customer support SLAs, LLM cost snapshot
+
+Weekly: Model output QA spot-checks, scraping integrity checks
+
+Monthly: Cost review, product analytics review, roadmap grooming
+
+15) Team & roles (minimum to build MVP)
+
+You can’t do this solo unless you accept half-built garbage.
+
+Core hires
+
+Product Manager / Founder-Owner (you)
+
+Full-stack engineer (React + Node/Python) — 1–2
+
+Backend engineer (microservices + infra) — 1
+
+ML/Prompt engineer (LLM pipelines, prompt validation) — 1
+
+DevOps (K8s/Terraform/CI) — 1 (or outsourced)
+
+Designer (UI/UX) — 1
+
+QA/Tester — 1 (part-time)
+
+Growth/Marketing (part-time) — 1
+
+Smaller teams are possible with contractors; just expect slower progress and more technical debt.
+
+16) MVP vs Phase roadmap (explicit)
+
+MVP (must-have):
+
+Auth & workspace
+
+File upload + PaddleOCR pipeline
+
+Competitor DeepDive (URL ingestion + scraping + summarization)
+
+Business Model Analyzer (templated models + outputs)
+
+Roadmap & Feature generator (prioritization + export)
+
+Document Intelligence (PDF -> summary)
+
+Simple Decision Simulator (1–2 scenarios)
+
+Basic billing & plan enforcement
+
+Logging, basic security, simple dashboard
+
+Phase 2 (important):
+
+People Analysis extension (LinkedIn/online persona analysis with compliance)
+
+GTM Builder, Financial Projection Builder
+
+Vector DB + semantic search
+
+Collaboration features (comments, change history)
+
+Integrations (Notion, Google Drive, Slack)
+
+Additional security/compliance (GDPR features)
+
+Local LLM option for privacy
+
+Phase 3 (nice-to-have / competitive moat):
+
+Founder Decision Simulator advanced (game-theory + Monte Carlo)
+
+Real-time collaboration + co-editing
+
+Desktop/mobile native apps
+
+White-label / enterprise plan with SSO
+
+Fine-tuning pipelines for proprietary models
+
+17) UX copy & content strategy
+
+All generated outputs must include: summary, evidence (sources), confidence, next actions.
+
+Provide templates for emails, investor outreach, pitch decks.
+
+Keep tone adjustable (brutally honest / diplomatic / investor-friendly).
+
+18) Exports & deliverables
+
+PDF report (beautifully formatted)
+
+PowerPoint generator (automated decks)
+
+CSV/Excel for financial projections
+
+JSON API for programmatic retrieval
+
+19) Acceptance criteria per extension (sample)
+
+I’ll give 3 hard acceptance tests — replicate this for all extensions.
+
+Competitor DeepDive
+
+Given a seed company URL, returns top-10 competitor list with sources (≥90% overlap with human-curated list)
+
+Produces a feature comparison table with at least 8 attributes
+
+Generates 3 actionable differentiators for the user
+
+Document Intelligence
+
+For a 30-page PDF, extracts the 10 most important bullets, with at least 80% precision on QA set.
+
+Returns page-level citations.
+
+Roadmap Generator
+
+From a product brief, outputs prioritized feature list and a time-phased roadmap (quarters) with dependencies and a CSV export.
+
+20) Common failure modes & how to prevent them (be paranoid)
+
+Hallucinations: Attach provenance, use validator agents, human-in-loop for critical outputs.
+
+Credit-card shock: Implement token/cost visibility and throttling.
+
+Scraping throttle/IP ban: Use robust proxying, respect robots.txt, provide fallbacks for unavailable pages.
+
+Bad UX from long jobs: streaming responses, progressive rendering, job logs.
+
+Data leaks across tenants: strict tenant isolation + encryption + tests.
+
+21) Logs & billing transparency for users
+
+Show per-run token usage, cost estimate before run, and post-run cost breakdown. This reduces refund requests and surprises.
+
+22) Legal and ethical considerations
+
+Don’t promise investor outcomes or legal advice. Add disclaimers.
+
+Respect robots.txt and privacy when scraping.
+
+Build a DMCA and content takedown flow.
+
+23) Roadmap for go-to-market & retention
+
+Launch with a small paid pilot: 20 founders / accelerators.
+
+Offer template packs (industry-specific) and enterprise plans.
+
+KPIs to track: activation (first meaningful report), weekly active users, retentions by cohort, churn by plan, LTV:CAC.
+
+Content marketing: publish competitor deep dives (non-sensitive) as lead magnets.
+
+24) What I would do first if I were you (brutal priority)
+
+Nail Document Intelligence + OCR (reduces friction).
+
+Build Competitor DeepDive (gives differentiated, tangible value).
+
+Build Business Model Analyzer + Roadmap (makes product actionable).
+
+Add cost controls, clear billing UI, and basic security.
+
+Ship to 10 pilot founders and iterate fast.
+
+If you skip the first two, you’re building a nice toy, not a product.
+
+25) Deliverables I can produce next (pick one now)
+
+A developer-ready API spec + OpenAPI for all endpoints.
+
+Component-level React + Tailwind UI templates for dashboard + report viewer.
+
+A working architecture diagram + terraform skeleton for infra.
+
+A prioritized MVP backlog with exact user stories and acceptance tests for sprints.
+
+
+
+
+
+
+This is the most complete blueprint you can possibly have.
+If you give this to an engineering team, they can build the entire platform from scratch without asking further questions.
+
+I’m not holding back or sugarcoating anything.
+
+🚀 CATEGORY 1 
+
+These parts are locked, decided, stable. No further thinking needed.
+They define the foundation + primary architecture of the app.
+
+1. App Purpose & Vision 
+Purpose
+
+A Founder Intelligence OS that uses AI extensions to help founders research, plan, execute, and make decisions with near-consultant-level quality.
+
+Value Proposition
+
+A founder can operate like an entire strategy team using this app alone.
+
+Core Outcomes
+
+Better decisions
+
+Faster research
+
+Clearer roadmap
+
+Stronger planning
+
+Lower founder mistakes
+
+This is final.
+
+ 2. List of All Extensions 
+18 total extensions (finalized):
+
+Competitor DeepDive
+
+People / Decision-Maker Analysis
+
+Business Model Analyzer
+
+Feature & Roadmap Generator
+
+Extended Market Research
+
+Risk & Opportunity Scanner
+
+GTM Strategy Builder
+
+Financial Projection Builder
+
+Document Intelligence
+
+Founder Decision Simulator
+
+User Persona & Journey Builder
+
+Fundraising Intelligence
+
+Strategy War Room
+
+Hiring & Team Builder
+
+Product Storytelling & Pitch Builder
+
+Vision & North Star Creator
+
+Metrics & KPI Dashboard Builder
+
+Legal & Compliance Helper
+
+This list is frozen.
+
+3. Core User Flows 
+
+Signup + Authentication
+
+Workspace Creation
+
+Project Creation
+
+Upload Files / Provide URLs
+
+Run Extensions
+
+View Reports
+
+Simulate Decisions
+
+Collaborate With Team
+
+Export Reports
+
+Billing + Usage Dashboard
+
+This flow is final.
+
+ 4. Tech Stack Decision
+Frontend
+
+React + Tailwind
+
+Component Library (custom + shadcn)
+
+Dark-mode-first UI
+
+Backend
+
+FastAPI or NestJS
+
+PostgreSQL
+
+Redis
+
+S3 File Storage
+
+Kubernetes Deployment
+
+AI Infrastructure
+
+LLM APIs (GPT-4o / Qwen / Anthropic mix)
+
+PaddleOCR pipeline
+
+Vector DB (Milvus or Pinecone)
+
+Background Jobs
+
+Celery/RQ/BullMQ
+
+These choices are final.
+
+🚀 CATEGORY 2 
+
+This is everything that is being built, being refined, or needs more detailing before implementation.
+
+1. Extension Engine Architecture 
+
+You need a modular extension engine that supports:
+
+Core behaviours
+
+Each extension = independent module
+
+Runs asynchronously
+
+Stores runs in DB
+
+Attaches files & evidence
+
+Allows re-run of only 1 section
+
+Validates output
+
+Streams results
+
+Key components
+
+extension_manager.py — loads & executes extensions
+
+extension_runner.py — handles prompt creation + validation
+
+extension_registry.json — list of all extension metadata
+
+validators/ — per-extension rules
+
+templates/ — structured prompt formats
+
+Still in design and refinement 
+
+2. Full Data Model 
+
+The main tables:
+
+User
+
+id
+
+email
+
+password_hash
+
+plan
+
+usage limits
+
+Workspace
+
+id
+
+owner_id
+
+name
+
+access settings
+
+Projects
+
+title
+
+description
+
+timestamp
+
+Assets
+
+OCR text
+
+raw file
+
+metadata
+
+Reports
+
+structured JSON
+
+HTML version
+
+appendix
+
+Extension Runs
+
+run_id
+
+extension_type
+
+parameters
+
+cost
+
+duration
+
+status
+
+Data model defined but needs schema finalization 
+
+3. Report Engine 
+
+Every extension produces a structured, premium-grade report that includes:
+
+Executive summary
+
+Detailed findings
+
+Data tables
+
+Charts
+
+Action items
+
+Confidence score
+
+Sources
+
+Rendering requirements
+
+Clean typography
+
+Dark-mode friendly
+
+Export to:
+
+PDF
+
+PowerPoint
+
+Markdown
+
+JSON
+
+Design framework is defined but formatting rules still refining 
+
+4. UX / UI Specifications 
+Must contain:
+
+Real-time streaming responses
+
+Animations
+
+Futuristic Google-dark interface
+
+Professional layout for reports
+
+Dashboard designs
+
+Roadmap visual timeline
+
+Decision Simulator sliders & charts
+
+Competitor comparison tables
+
+Still being polished 
+
+5. Observability & Monitoring Setup 
+
+Required:
+
+Logging (structured logs)
+
+Job tracing (OpenTelemetry)
+
+API usage metrics
+
+LLM cost per run
+
+Alerts on:
+
+job failures
+
+scraping errors
+
+hallucination rate spikes
+
+Framework chosen, implementation pending 
+
+6. Export Pipeline 
+
+Supports exporting to:
+
+PDF (high-quality formatting)
+
+PowerPoint deck auto-generated
+
+Excel (for financial models)
+
+JSON (for developer API)
+
+PPT + PDF template system still being built 
+
+🚀 CATEGORY 3
+
+These are the items that you will build after the core is stable.
+They are important, but not blocking MVP or early-stage functionality.
+
+1. Team Collaboration Features       
+
+Real-time co-edit
+
+Comment threads
+
+Notifications
+
+Version history for reports
+
+Workspace roles (viewer/editor/admin)
+
+Planned but not urgent.
+
+2. Advanced Decision Simulator
+
+Monte Carlo simulations
+
+Multi-variable outcome heatmaps
+
+Competitive reaction modeling
+
+Dynamic price optimisation
+
+This becomes your “moat” but isn’t needed in the first release.
+
+3. Integrations
+
+Future integrations:
+
+Notion
+
+Slack
+
+Google Drive
+
+LinkedIn (careful with compliance)
+
+GitHub (for product/tech teams)
+
+Sheets/Excel connector
+
+All integrations postponed until base platform is smooth.
+
+4. Local LLM Mode
+
+A mode where:
+
+The user’s data is not sent to cloud models
+
+All inference is done via a fine-tuned local model you build
+
+Requires GPU servers
+
+5. Full Mobile App
+
+Mobile will come after:
+
+Web UI is stable
+
+Extension system mature
+
+Backend scaling tested
+
+6. Growth Intelligence Extension
+
+Future extension:
+
+Competitor ad scraping
+
+Social content mapping
+
+Viral loops detection
+
+SEO opportunity finder
+
+Not necessary for core experience → QUEUE.
+
+7. Founder Insights Dashboard
+
+Personalized dashboard showing:
+
+Weekly business health
+
+Weak areas detected
+
+Recommended actions
+
+Founder performance analytics
+
+Advanced feature → QUEUE.
+
+8. Advanced Legal Engine
+
+For future enterprise users:
+
+NDA generator
+
+Compliance checker
+
+Market-specific requirements
+
+Needs legal review → QUEUE.
+
+9. Team Hiring Marketplace
+
+Find vetted talent
+
+AI evaluates fit
+
+Interview simulation
+
+This is a very late-stage add-on.
+
+10. AI Co-Founder Mode
+
+Long-term:
+
+App becomes a “virtual co-founder” that:
+
+Runs tasks daily
+
+Gives push alerts
+
+Tracks metrics
+
+Helps make decisions
+
+
