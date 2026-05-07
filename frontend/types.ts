@@ -492,3 +492,99 @@ export interface CompetitorDeepDiveResult {
     communicationStrategy: string;
   };
 }
+
+// --- LaunchMintAI Premium Types ---
+
+export interface Competitor {
+    name: string;
+    weakness: string;
+    url: string;
+    market_fin: { 
+        funding: string; 
+        investors: string; 
+        management: string; 
+        share?: string; 
+        audience?: string 
+    };
+    product_intel: { 
+        pricing: string; 
+        features: string; 
+        swot: string; 
+        ux_friction?: string 
+    };
+    technical_infra: { 
+        stack: string; 
+        velocity: string; 
+        platform: string 
+    };
+    sentiment: { 
+        complaints: string; 
+        trust_score: string; 
+        churn_drivers: string 
+    };
+    marketing: { 
+        acquisition: string; 
+        seo_keywords: string; 
+        social_status: string 
+    };
+    kill_strategy: string;
+}
+
+export interface ForensicMetadata {
+    confidence_score: number;
+    veracity_index: number;
+    source_diversity: number;
+    reasoning_trace: string[];
+    bias_assessment: string;
+}
+
+export interface RealData {
+    idea?: string;
+    market: {
+        size: string;
+        current_tam?: string;
+        forecast_tam?: string;
+        current_year?: string;
+        forecast_year?: string;
+        growth: string;
+        confidence: string;
+        source_url: string;
+        source_name: string;
+        veracity_quote?: string;
+        timing?: { label: string; rationale: string; };
+        classified_industry?: string;
+    };
+    monetization?: { model: string; strategy: string; };
+    competitors: Competitor[];
+    forensics?: ForensicMetadata;
+    dept_legal?: string[]; 
+    dept_product?: string[]; 
+    dept_marketing?: string[]; 
+    dept_finance?: string[];
+    god_mode?: { 
+        macro_verdict: string; 
+        swarm_summary: string; 
+        risk_score: string; 
+        pivot_warning?: string; 
+    };
+    gen_ui?: { feature: string; desc: string; };
+    pivot_suggestion?: { idea: string; potential: string; rationale: string; };
+    citations?: { title: string; url: string; }[];
+    idea_analysis?: string;
+}
+
+export interface PitchForgeData { 
+    tagline: string; 
+    elevator_pitch: string; 
+    tweet_thread_hook: string; 
+    cold_email_subject: string; 
+    value_proposition: string; 
+}
+
+export interface VCRoastData { 
+    kill_shot: string; 
+    brutal_feedback: string[]; 
+    competitor_alert: string; 
+    investment_verdict: string; 
+    survival_chance: number; 
+}
