@@ -2,24 +2,29 @@
 .claude/
 .venv/
 venv/
+backend/venv/
+frontend/node_modules/
 .env
 __pycache__/
 .vscode/
 
 # --- Databases (CRITICAL) ---
-# Prevents binary bloat and locked-file errors in the IDE
 *.db
 *.sqlite3
 backend/chroma_data/
 backend/*.db
+backend/launchmint.db
+backend/launchmint_intelligence.db
 
 # --- Project Specific Logs & Reports ---
-# Your PowerShell logs showed heavy activity here; stop tracking them
 backend/logs/
 generated_reports/
 *.log
 *.txt
 *.csv
+# Ensure specific stress logs are caught
+backend/logs/stress_*.txt
+backend/logs/backend_logs.txt
 
 # --- Build & Distribution ---
 node_modules/
@@ -34,7 +39,6 @@ dist/
 *.apk
 
 # --- Legacy & Temporary Assets ---
-# You moved these to 'OLD UI IMAGES'—they don't belong in source control
 OLD UI IMAGES/
 scratch/
 hs_err_pid*
