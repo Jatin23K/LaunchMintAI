@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AgentEvent, StartupReport } from "../types";
 import { TOOLS } from "../constants";
 
-const BACKEND_URL = "http://127.0.0.1:8000/run";
+const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000") + "/run";
 
 // --- VALIDATION MODE: ALL 4 AGENTS USE REAL AI ---
 const REAL_AGENTS = [
