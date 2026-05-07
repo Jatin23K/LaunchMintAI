@@ -1,19 +1,45 @@
-hs_err_pid*
-replay_pid*
+# --- AI & Environment ---
 .claude/
-bin/
-data/
-models/
-__pycache__/
 .venv/
 venv/
 .env
+__pycache__/
 .vscode/
+
+# --- Databases (CRITICAL) ---
+# Prevents binary bloat and locked-file errors in the IDE
+*.db
+*.sqlite3
+backend/chroma_data/
+backend/*.db
+
+# --- Project Specific Logs & Reports ---
+# Your PowerShell logs showed heavy activity here; stop tracking them
+backend/logs/
+generated_reports/
+*.log
+*.txt
+*.csv
+
+# --- Build & Distribution ---
 node_modules/
+bin/
+data/
+models/
 build/
 dist/
-*.log
 *.exe
 *.bin
 *.zip
 *.apk
+
+# --- Legacy & Temporary Assets ---
+# You moved these to 'OLD UI IMAGES'—they don't belong in source control
+OLD UI IMAGES/
+scratch/
+hs_err_pid*
+replay_pid*
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
