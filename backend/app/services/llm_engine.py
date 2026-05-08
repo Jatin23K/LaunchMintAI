@@ -23,9 +23,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.market_search import search_market_data, format_search_results_for_prompt
+import app.ds.pipeline as ds_pipeline
 
 load_dotenv()
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY_1")
 API_KEY = GEMINI_API_KEY
 
 app = FastAPI()
@@ -40,11 +41,28 @@ app.add_middleware(
 class IdeaRequest(BaseModel):
     idea: str
 
+class DSInsightsRequest(BaseModel):
+    idea: str
+    market_data: dict = {}
+    competitors: list = []
+
 class VCRoastRequest(BaseModel):
     user_idea: str
 
+@app.post("/ds_insights")
+async def ds_insights(req: DSInsightsRequest):
+    try:
+        result = ds_pipeline.run(
+            idea=req.idea,
+            market_data=req.market_data,
+            competitors=req.competitors
+        )
+        return {"status": "success", "data": result}
+    except Exception as e:
+        return {"status": "error", "data": {"error": str(e)}}
+
 # ============================================================================
-# 🏢 GIANT INTELLIGENCE (Ground Truth for the Top Players)
+#  GIANT INTELLIGENCE (Ground Truth for the Top Players)
 # ============================================================================
 
 GIANT_INTEL = {
@@ -120,16 +138,16 @@ def is_valid_source(url):
     return True
 
 # ============================================================================
-# 🧹 SMART EXTRACTOR
+#  SMART EXTRACTOR
 # ============================================================================
 
 def extract_precise_value(text):
     if not text or "Unavailable" in text: return "Data Unavailable"
     
-    clean_text = text.upper().replace("USD", "$").replace("INR", "₹").replace("RS", "₹")
+    clean_text = text.upper().replace("USD", "$").replace("INR", "").replace("RS", "")
     
     # Regex: Matches $22.5B, 22.5 Billion, 22.5 Bn
-    pattern = r"(\$|₹)?\s?(\d+(?:\.\d+)?)\s?(BILLION|BN|B|TRILLION|TN|T)"
+    pattern = r"(\$|)?\s?(\d+(?:\.\d+)?)\s?(BILLION|BN|B|TRILLION|TN|T)"
     
     matches = re.findall(pattern, clean_text)
     
@@ -188,7 +206,7 @@ def professionalize_source(raw_name):
     return str(raw_name).strip()
 
 # ============================================================================
-# 🔎 DUAL-LAYER SEARCH ENGINE
+#  DUAL-LAYER SEARCH ENGINE
 # ============================================================================
 
 def execute_search(query, num_results):
@@ -203,7 +221,7 @@ def execute_search(query, num_results):
                     clean.append(r)
             return clean
     except Exception as e:
-        print(f"⚠️ Search Query Failed: {query} - {e}")
+        print(f" Search Query Failed: {query} - {e}")
         return []
 
 def search_web(idea, mode="financial"):
@@ -214,7 +232,7 @@ def search_web(idea, mode="financial"):
         if mode == "financial":
             # Use the Robust Market Search Module (Tavily/God Mode)
             # This respects TIER 1 sources and waterfalls correctly.
-            print(f"🌊 [SEARCH ROUTER] Routing to Tavily Market Search for: {idea}")
+            print(f" [SEARCH ROUTER] Routing to Tavily Market Search for: {idea}")
             market_data = search_market_data(idea)
             
             # Format results for the LLM context
@@ -229,7 +247,7 @@ def search_web(idea, mode="financial"):
             # But wait, looking at execute_search, it is using DDG.
             
             query_c = f"top competitors and alternatives for {idea}"
-            print(f"🔎 Search Competitors (DDG): {query_c}...")
+            print(f" Search Competitors (DDG): {query_c}...")
             results = execute_search(query_c, 8)
             
             if not results: return "No competitor data found.", "", "Analysis"
@@ -238,7 +256,7 @@ def search_web(idea, mode="financial"):
             return context, "", "Competitor Analysis"
 
     except Exception as e:
-        print(f"❌ Critical Search Router Failure: {e}")
+        print(f" Critical Search Router Failure: {e}")
         return "", "", "Standard Industry Report"
 
         if not results: return "", "", "Market Consensus"
@@ -255,7 +273,7 @@ def search_web(idea, mode="financial"):
         return context, top['href'], professionalize_source(source)
 
     except Exception as e:
-        print(f"❌ Critical Search Failure: {e}")
+        print(f" Critical Search Failure: {e}")
         return "", "", "Standard Industry Report"
 
 def generate_dynamic_fallback(idea, mkt_url="#", mkt_src="Industry Benchmark"):
@@ -376,12 +394,12 @@ def generate_dynamic_fallback(idea, mkt_url="#", mkt_src="Industry Benchmark"):
     }
 
 # ============================================================================
-# 🤖 AI ENGINE (Aggressive & Stable)
+#  AI ENGINE (Aggressive & Stable)
 # ============================================================================
 
 def call_gemini(prompt, model_id="gemini-1.5-flash"):
     # ROTATE MODELS (Default or Specific)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model_id}:generateContent?key={API_KEY}"
     headers = {"Content-Type": "application/json"}
     payload = { "contents": [{ "parts": [{"text": prompt}] }] }
     
@@ -392,12 +410,12 @@ def call_gemini(prompt, model_id="gemini-1.5-flash"):
             if res.status_code == 200:
                 return res.json()["candidates"][0]["content"]["parts"][0]["text"]
             else:
-                print(f"⚠️ AI API Error {res.status_code}: {res.text}")
+                print(f" AI API Error {res.status_code}: {res.text}")
                 if res.status_code == 429:
-                    print(f"⚠️ Quota Error (429). Waiting 2s...")
+                    print(f" Quota Error (429). Waiting 2s...")
                     time.sleep(2)
         except Exception as e:
-            print(f"⚠️ AI Request Exception: {e}")
+            print(f" AI Request Exception: {e}")
             time.sleep(1)
     return "{}"
 
@@ -414,13 +432,13 @@ def clean_json(text):
 
 def audit_search_results(results_list, query):
     """
-    🤖 AI JUDGE (Agentic RAG Validator)
+    AI JUDGE (Agentic RAG Validator)
     Uses Gemini 1.5 Flash to semantically audit search results.
     removes 'shitty' data (irrelevant, outdated, spam, wrong market).
     """
     if not results_list: return []
     
-    print(f"⚖️ [AI JUDGE] Auditing {len(results_list)} sources for quality...")
+    print(f"[JUDGE] Auditing {len(results_list)} sources for quality...")
     
     # Prepare Context for Judge
     candidates = []
@@ -456,11 +474,11 @@ def audit_search_results(results_list, query):
         
         if isinstance(valid_indices, list):
             clean_results = [results_list[i] for i in valid_indices if i < len(results_list)]
-            print(f"⚖️ [AI JUDGE] Verdict: Kept {len(clean_results)}/{len(results_list)} sources.")
+            print(f" [AI JUDGE] Verdict: Kept {len(clean_results)}/{len(results_list)} sources.")
             return clean_results
             
     except Exception as e:
-        print(f"⚠️ Start Auditor Failed: {e}")
+        print(f" Start Auditor Failed: {e}")
         
     return results_list # Fallback: Return original list if judge fails
 
@@ -482,7 +500,7 @@ def calculate_missing_tam(market_data: dict) -> dict:
         has_growth = (growth and "%" in growth)
         
         if needs_calc and has_forecast and has_growth:
-            print("🧮 [MATH FALLBACK] Calculating missing Current TAM...")
+            print(" [MATH FALLBACK] Calculating missing Current TAM...")
             
             # Parse Forecast (e.g. "$155.6B" -> 155.6)
             fv_str = re.sub(r"[^\d\.]", "", forecast_tam)
@@ -509,14 +527,14 @@ def calculate_missing_tam(market_data: dict) -> dict:
             # Format Result
             pv_formatted = f"${pv:.1f}B"
             
-            print(f"✅ [MATH FALLBACK] Calculated: {pv_formatted} (from {forecast_tam} @ {growth} over {n} yrs)")
+            print(f" [MATH FALLBACK] Calculated: {pv_formatted} (from {forecast_tam} @ {growth} over {n} yrs)")
             
             # Update Data
             market_data["current_tam"] = pv_formatted
             market_data["current_year"] = f"{current_year_target} (Calc)"
             
     except Exception as e:
-        print(f"⚠️ Math Fallback Failed: {e}")
+        print(f" Math Fallback Failed: {e}")
         
     return market_data
 
@@ -536,7 +554,7 @@ def classify_industry(idea: str) -> dict:
     
     clean_idea = idea.lower().strip()
     if clean_idea in HARDCODED_TRANSLATIONS:
-        print(f"⚡ [CLASSIFIER] Using Hardcoded Translation for '{idea}'")
+        print(f" [CLASSIFIER] Using Hardcoded Translation for '{idea}'")
         return HARDCODED_TRANSLATIONS[clean_idea]
 
     # 1. AI CLASSIFICATION
@@ -556,7 +574,7 @@ def classify_industry(idea: str) -> dict:
     Input: "{idea}"
     """
     # USE THE FAST MODEL FOR CLASSIFICATION
-    raw = call_gemini(prompt, model_id="gemini-flash-lite-latest")
+    raw = call_gemini(prompt, model_id="gemini-1.5-flash")
     data = clean_json(raw)
     if data: return data
     
@@ -577,18 +595,18 @@ async def analyze(req: IdeaRequest):
     idea = req.idea
     
     # === STEP 1: IDEA CLASSIFICATION (TRANSLATOR LAYER) ===
-    print(f"\n🧠 [CLASSIFIER] Translating '{idea}' to industry terms...")
+    print(f"\n[BRAIN] [CLASSIFIER] Translating '{idea}' to industry terms...")
     industry_data = classify_industry(idea)
     search_query = industry_data.get("search_query", idea)
     industry_name = industry_data.get("industry_name", "Unknown")
-    print(f"✅ [CLASSIFIER] Identified Sector: {industry_name}")
-    print(f"🎯 [CLASSIFIER] Professional Query: {search_query}")
+    print(f"[OK] [CLASSIFIER] Identified Sector: {industry_name}")
+    print(f"[TARGET] [CLASSIFIER] Professional Query: {search_query}")
 
     # === STEP 2: SEARCH GROUNDING (NEW) ===
-    print(f"\n🔍 [SEARCH GROUNDING] Searching real market data for: {search_query}")
+    print(f"\n[SEARCH] [SEARCH GROUNDING] Searching real market data for: {search_query}")
     # Pass the TRANSLATED search query as the 'industry' parameter
-    search_data = search_market_data(idea, industry=search_query) 
-    print(f"✅ [SEARCH GROUNDING] Found {search_data['results_count']} raw sources")
+    search_data = await search_market_data(idea, search_query) 
+    print(f"[OK] [SEARCH GROUNDING] Found {search_data['results_count']} raw sources")
     
     # === STEP 2.5: AI AUDIT (THE JUDGE) ===
     # Filter the raw results using the AI Judge
@@ -616,7 +634,7 @@ async def analyze(req: IdeaRequest):
              # Re-run prompt formatting ? No, format_search_results_for_prompt uses the dict.
              # We just updated the dict in place.
         else:
-             print("⚠️ [AI JUDGE] Rejected ALL sources. Falling back to empty.")
+             print(" [AI JUDGE] Rejected ALL sources. Falling back to empty.")
              search_data['results_count'] = 0
              search_data['raw_context'] = "No valid data found after audit."
 
@@ -627,7 +645,7 @@ async def analyze(req: IdeaRequest):
     # Format search results for prompt injection
     grounded_context = format_search_results_for_prompt(search_data)
     
-    print(f"\n🚀 Processing: {idea}")
+    print(f"\n Processing: {idea}")
 
     # 1. FETCH PRELIM COMP DATA (Market data now comes from search_market_data)
     comp_prelim, _, _ = search_web(idea, mode="competitor")
@@ -638,7 +656,7 @@ async def analyze(req: IdeaRequest):
     comp_names = clean_json(comp_names_raw)
     
     if not isinstance(comp_names, list) or not comp_names:
-        print("⚠️ AI Name Extraction failed. Using Regex Fallback...")
+        print(" AI Name Extraction failed. Using Regex Fallback...")
         import urllib.parse
         # Extract domains from text
         urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', comp_prelim)
@@ -660,7 +678,7 @@ async def analyze(req: IdeaRequest):
         if giant:
             return f"\n--- {name} GROUND TRUTH ---\nData: {json.dumps(giant)}\n"
             
-        print(f"🕵️ Swarm Researching: {name}...")
+        print(f" Swarm Researching: {name}...")
         agents = {
             "Headhunter": f"{name} CEO founders leadership management team",
             "Accountant": f"{name} revenue valuation funding rounds investors financials",
@@ -699,7 +717,7 @@ async def analyze(req: IdeaRequest):
     
     Task: Analyze the provided "Market Data" and "Competitor Intel" for: "{idea}".
     
-    🛡️ ANTI-HALLUCINATION & CONTEXT ALIGNMENT:
+     ANTI-HALLUCINATION & CONTEXT ALIGNMENT:
     1. INDUSTRY MATCH: Verify that the numbers you use are for the EXACT industry (e.g. if the idea is "Dog Walking", DO NOT use "Pet Insurance" or "Total Pet Care" numbers).
     2. SOURCE VERIFICATION: If the source is a blog (e.g. Forbes Advisor) and lacks a concrete table or market report citation, skip it.
     3. NO CALCULATIONS: Do not multiply "Number of Pet Owners" by "$20/walk" to guess a market size. If the data isn't in the reports, return "Data unavailable".
@@ -786,12 +804,12 @@ async def analyze(req: IdeaRequest):
     """
     
     try:
-        raw = call_gemini(prompt)
+        raw = call_gemini(ANALYZE_PROMPT)
         data = clean_json(raw)
         
         if not data or not data.get("market"): 
             # DYNAMIC FALLBACK (Avoids identical 'Data Unavailable' results)
-            print(f"⚠️ AI Failure. Generating Dynamic Fallback for: {idea}")
+            print(f" AI Failure. Generating Dynamic Fallback for: {idea}")
             fallback = generate_dynamic_fallback(idea, mkt_url, mkt_src)
             # Apply Math Fallback to Fallback Data
             if fallback and "market" in fallback:
@@ -812,7 +830,7 @@ async def analyze(req: IdeaRequest):
         for comp in data.get("competitors", []):
             giant = get_giant_data(comp["name"])
             if giant:
-                print(f"💉 Injecting Real Giant Data for: {comp['name']}")
+                print(f" Injecting Real Giant Data for: {comp['name']}")
                 comp["url"] = giant["url"]
                 comp["market_fin"] = giant["market_fin"]
                 comp["product_intel"] = giant["product_intel"]
@@ -830,7 +848,7 @@ async def analyze(req: IdeaRequest):
         return data
 
     except Exception as e:
-        print(f"🔥 UNEXPECTED FAILURE: {e}")
+        print(f" UNEXPECTED FAILURE: {e}")
         fallback = generate_dynamic_fallback(idea, mkt_url, mkt_src)
         if fallback and "market" in fallback:
              fallback["market"] = calculate_missing_tam(fallback["market"])
@@ -839,7 +857,7 @@ async def analyze(req: IdeaRequest):
 
 
 # ============================================================================
-# 🦅 WAR ROOM ENDPOINT ("CORPORATE SPY")
+#  WAR ROOM ENDPOINT ("CORPORATE SPY")
 # ============================================================================
 
 WAR_ROOM_PROMPT = """
@@ -893,7 +911,7 @@ YOU ARE AN ELITE STRATEGY CONSULTANT (EX-MCKINSEY/SEQUOIA).
 @app.post("/war_room")
 def war_room(request: IdeaRequest):
     idea = request.idea
-    print(f"\n🦅 WAR ROOM INFILTRATION: {idea}")
+    print(f"\n[WAR] WAR ROOM INFILTRATION: {idea}")
     
     # 1. Reuse Swarm Search to get basic intel
     # (In a real scenario, we might want separate search logic, but reusing is faster for now)
@@ -907,7 +925,7 @@ def war_room(request: IdeaRequest):
         if not data: raise ValueError("Spy sat downlink failed.")
         return data
     except Exception as e:
-        print(f"🦅 SPY FAILURE: {e}")
+        print(f"[WAR] SPY FAILURE: {e}")
         return {
             "god_mode": {
                 "macro_verdict": "Mission Aborted. Enemy jammers active.",
@@ -920,7 +938,7 @@ def war_room(request: IdeaRequest):
         }
 
 # ============================================================================
-# 💀 VC ROAST ENDPOINT ("THE SKEPTIC")
+# [SKEPTIC] VC ROAST ENDPOINT ("THE SKEPTIC")
 # ============================================================================
 
 VC_ROAST_PROMPT = """
@@ -964,7 +982,7 @@ TONE RULES:
 @app.post("/vc_roast")
 def vc_roast(request: VCRoastRequest):
     user_idea = request.user_idea
-    print(f"\n💀 VC ROASTING: {user_idea}")
+    print(f"\n[SKEPTIC] VC ROASTING: {user_idea}")
     
     full_prompt = f"{VC_ROAST_PROMPT}\n\nTARGET IDEA: {user_idea}"
     
@@ -974,7 +992,7 @@ def vc_roast(request: VCRoastRequest):
         if not data: raise ValueError("Roast failed.")
         return data
     except Exception as e:
-        print(f"💀 ROAST FAILURE: {e}")
+        print(f"[SKEPTIC] ROAST FAILURE: {e}")
         return {
             "kill_shot": "Your backend crashed, just like this startup will.",
             "brutal_feedback": ["Server Timeout: Even the AI refused to analyze this.", "Technical Debt: You handled this error poorly.", "Market Fit: Zero."],
@@ -984,7 +1002,7 @@ def vc_roast(request: VCRoastRequest):
         }
 
 # ============================================================================
-# ⚡ PITCH FORGE ENDPOINT ("THE SALESMAN")
+#  PITCH FORGE ENDPOINT ("THE SALESMAN")
 # ============================================================================
 
 PITCH_FORGE_PROMPT = """
@@ -1026,7 +1044,7 @@ class PitchForgeRequest(BaseModel):
 @app.post("/pitch_forge")
 def pitch_forge(request: PitchForgeRequest):
     user_idea = request.user_idea
-    print(f"\n⚡ PITCH FORGING: {user_idea}")
+    print(f"\n[FORGE] PITCH FORGING: {user_idea}")
     
     full_prompt = f"{PITCH_FORGE_PROMPT}\n\nTARGET IDEA: {user_idea}"
     
@@ -1036,7 +1054,7 @@ def pitch_forge(request: PitchForgeRequest):
         if not data: raise ValueError("Pitch Forge failed.")
         return data
     except Exception as e:
-        print(f"⚡ FORGE FAILURE: {e}")
+        print(f"[FORGE] FORGE FAILURE: {e}")
         return {
             "tagline": "Error 500: We failed to sell this.",
             "elevator_pitch": "Our servers crashed trying to make your idea sound good. Manual reboot required.",
@@ -1049,17 +1067,17 @@ def pitch_forge(request: PitchForgeRequest):
 
 
 # ============================================================================
-# 🔧 LEGACY EXTENSION SUPPORT
+#  LEGACY EXTENSION SUPPORT
 # ============================================================================
 class LLMWrapper:
     def analyze(self, prompt: str) -> str:
         """Compatibility layer for Extensions relying on llm.analyze()"""
-        print(f"🔧 Legacy Extension Call: {prompt[:50]}...")
+        print(f" Legacy Extension Call: {prompt[:50]}...")
         return call_gemini(prompt)
 
 llm = LLMWrapper()
 
 if __name__ == "__main__":
     import uvicorn
-    print("🌟 Starting Backend Service (High Availability Mode)...")
+    print("[OK] Starting Backend Service (High Availability Mode)...")
     uvicorn.run(app, host="127.0.0.1", port=8000)

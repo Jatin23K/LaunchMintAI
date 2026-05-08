@@ -12,6 +12,15 @@ load_dotenv()
 # 1. SETUP APP
 app = FastAPI()
 
+from fastapi import Request
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    if request.method == "POST":
+        body = await request.body()
+        print(f"DEBUG: Request to {request.url.path} with body: {body.decode()}")
+    response = await call_next(request)
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,7 +38,7 @@ class AnalyzeRequest(BaseModel):
     idea: str
 
 # 2. MANUAL IMPORT (No Try/Except - We want to see the REAL error)
-print("⏳ Importing Extensions...")
+print("[WAIT] Importing Extensions...")
 from app.extensions.market_research.extension import Extension as MarketResearch
 from app.extensions.competitor_deepdive.extension import Extension as CompetitorDeepDive
 from app.extensions.business_model.extension import Extension as BusinessModel
@@ -48,7 +57,7 @@ from app.extensions.vision_north_star.extension import Extension as Vision
 from app.extensions.metrics_kpi.extension import Extension as KPI
 from app.extensions.legal_compliance.extension import Extension as Legal
 from app.extensions.document_intelligence.extension import Extension as DocIntel
-print("✅ IMPORTS SUCCESSFUL")
+print("[OK] IMPORTS SUCCESSFUL")
 
 # 3. REGISTER EXTENSIONS
 EXTENSIONS = {
@@ -75,7 +84,7 @@ EXTENSIONS = {
 @app.post("/run")
 async def run_extension(req: ExtensionRequest):
     ext_id = req.extension_id.replace("_", "-")
-    print(f"🚀 REQ: {ext_id}")
+    print(f"[REQ] REQ: {ext_id}")
     
     if ext_id not in EXTENSIONS:
         raise HTTPException(404, detail=f"Extension '{ext_id}' not found.")
@@ -84,7 +93,7 @@ async def run_extension(req: ExtensionRequest):
         result = EXTENSIONS[ext_id].execute(req.payload)
         return {"status": "success", "data": result}
     except Exception as e:
-        print(f"   💀 ERROR: {e}")
+        print(f"    ERROR: {e}")
         return {"status": "error", "data": {"error": str(e)}}
 
 # =============================================================================
@@ -94,6 +103,8 @@ async def run_extension(req: ExtensionRequest):
 # We'll mount it here to make it accessible
 
 from app.services.llm_engine import app as llm_app
+
+#  DS Layer moved to llm_engine.py
 
 # Mount the LLM engine's endpoints
 app.mount("/", llm_app)
@@ -178,3 +189,9 @@ def sort_feed(f: FeedInput):
 @app.get("/")
 def health():
     return {"status": "Online"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    print("[OK] Starting Backend Service...")
+    uvicorn.run(app, host="0.0.0.0", port=port)
