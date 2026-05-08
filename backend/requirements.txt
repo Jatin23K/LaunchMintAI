@@ -10,11 +10,11 @@ sqlmodel
 chromadb==1.1.1
 loguru
 pydantic-settings
-# DS Intelligence Layer
-xgboost==2.0.3
-scikit-learn==1.4.2
+# DS Intelligence Layer — versions with pre-built wheels for Python 3.11-3.14
+xgboost>=2.0.3
+scikit-learn>=1.5.2
 vaderSentiment==3.3.2
-numpy==1.26.4
-pandas==2.2.2
-matplotlib==3.10.8
+numpy>=1.26.4
+pandas>=2.2.2
+matplotlib>=3.8.0
 joblib
