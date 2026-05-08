@@ -10,6 +10,7 @@ import json
 import requests
 import re
 import time
+import asyncio
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -294,122 +295,67 @@ def search_web(idea, mode="financial"):
         print(f" Critical Search Failure: {e}")
         return "", "", "Standard Industry Report"
 
-def generate_dynamic_fallback(idea, mkt_url="#", mkt_src="Industry Benchmark"):
-    """Generates unique, plausible market data based on the idea keywords."""
-    import hashlib
-    
-    # Deterministic jitter based on the idea string
-    h = int(hashlib.md5(idea.encode()).hexdigest(), 16)
-    jitter = (h % 100) / 10.0 # 0.0 to 10.0
-    
-    # Sector mapping (Intelligent Fallback Database)
-    # Format: (Market Size, Growth, [ (Name, URL), (Name, URL), (Name, URL) ])
-    sectors = {
-        "dog": ("$3.1B", "12.0%", [("Rover", "https://www.rover.com"), ("Wag!", "https://wagwalking.com"), ("PetBacker", "https://www.petbacker.com")]),
-        "pet": ("$3.1B", "12.0%", [("Rover", "https://www.rover.com"), ("Wag!", "https://wagwalking.com"), ("PetBacker", "https://www.petbacker.com")]),
-        "legal": ("$85.5B", "4.2%", [("LegalZoom", "https://www.legalzoom.com"), ("Rocket Lawyer", "https://www.rocketlawyer.com"), ("Clio", "https://www.clio.com")]),
-        "farming": ("$12.4B", "3.1%", [("John Deere", "https://www.deere.com"), ("Farmers Edge", "https://www.farmersedge.ca"), ("Trimble", "https://www.trimble.com")]),
-        "pizza": ("$45.2B", "5.4%", [("Domino's", "https://www.dominos.com"), ("Pizza Hut", "https://www.pizzahut.com"), ("Papa John's", "https://www.papajohns.com")]),
-        "drone": ("$32.5B", "25.0%", [("DJI", "https://www.dji.com"), ("Parrot", "https://www.parrot.com"), ("Skydio", "https://www.skydio.com")]),
-        "taxi": ("$320.5B", "8.2%", [("Uber", "https://www.uber.com"), ("Ola", "https://www.olacabs.com"), ("Rapido", "https://www.rapido.bike")]),
-        "transport": ("$450.0B", "6.5%", [("Didi", "https://www.didiglobal.com"), ("Grab", "https://www.grab.com"), ("Lyft", "https://www.lyft.com")]),
-        "saas": ("$197.3B", "18.2%", [("Salesforce", "https://www.salesforce.com"), ("HubSpot", "https://www.hubspot.com"), ("Zendesk", "https://www.zendesk.com")]),
-        "software": ("$250.0B", "15.0%", [("Oracle", "https://www.oracle.com"), ("Microsoft", "https://www.microsoft.com"), ("SAP", "https://www.sap.com")]),
-        "ai": ("$150.2B", "35.8%", [("OpenAI", "https://www.openai.com"), ("Anthropic", "https://www.anthropic.com"), ("Google DeepMind", "https://www.deepmind.com")]),
-        "packaging": ("$310.8B", "5.4%", [("WestRock", "https://www.westrock.com"), ("Amcor", "https://www.amcor.com"), ("Ball Corp", "https://www.ball.com")]),
-        "fintech": ("$225.0B", "22.5%", [("Stripe", "https://www.stripe.com"), ("PayPal", "https://www.paypal.com"), ("Square", "https://squareups.com")]),
-        "whatsapp": ("$26.6B", "12.3%", [("WhatsApp", "https://www.whatsapp.com"), ("Telegram", "https://telegram.org"), ("Signal", "https://signal.org")]),
-        "social": ("$145.2B", "11.5%", [("Facebook", "https://www.facebook.com"), ("TikTok", "https://www.tiktok.com"), ("Snapchat", "https://www.snapchat.com")]),
-        "messenger": ("$26.6B", "12.3%", [("WhatsApp", "https://www.whatsapp.com"), ("Telegram", "https://telegram.org"), ("Signal", "https://signal.org")]),
-        "teen": ("$45.2B", "12.3%", [("Revolut <18", "https://www.revolut.com/revolut-under-18"), ("Step", "https://step.com"), ("Greenlight", "https://greenlight.com")]),
-        "education": ("$110.5B", "14.2%", [("Coursera", "https://www.coursera.org"), ("Duolingo", "https://www.duolingo.com"), ("Khan Academy", "https://www.khanacademy.org")]),
-        "food": ("$150.8B", "12.2%", [("DoorDash", "https://www.doordash.com"), ("Uber Eats", "https://www.ubereats.com"), ("Zomato", "https://www.zomato.com")]),
-        "ecommerce": ("$5.8T", "9.5%", [("Amazon", "https://www.amazon.com"), ("Shopify", "https://www.shopify.com"), ("eBay", "https://www.ebay.com")]),
-        "market": ("$50.5B", "10.0%", [("Giant X", "#"), ("Incumbent Y", "#"), ("Challenger Z", "#")]),
-        "stripe": ("$225.0B", "22.5%", [("Stripe", "https://www.stripe.com"), ("PayPal", "https://www.paypal.com"), ("Square", "https://squareups.com")]),
-        "openai": ("$150.2B", "35.8%", [("OpenAI", "https://www.openai.com"), ("Anthropic", "https://www.anthropic.com"), ("Google DeepMind", "https://www.deepmind.com")]),
-        "claude": ("$150.2B", "35.8%", [("Anthropic", "https://www.anthropic.com"), ("OpenAI", "https://www.openai.com"), ("Google DeepMind", "https://www.deepmind.com")]),
-    }
-    
-    # Find best sector match
-    match = ("$22.5B", "12.5%", [("Industry Giant A", "#"), ("Global Player B", "#"), ("Local Leader C", "#")]) 
-    for kw, val in sectors.items():
-        if kw in idea.lower():
-            match = val
-            break
-            
-    # Apply jitter to the price to ensure uniqueness
-    try:
-        base_val = float(match[0].replace("$", "").replace("B", ""))
-    except:
-        base_val = 22.5
-    unique_val = round(base_val + jitter, 1)
-    
-    comps = []
-    for i in range(3):
-        try:
-            name, url = match[2][i]
-        except:
-            name, url = f"Giant {chr(65+i)}", "#"
-            
-        giant = get_giant_data(name)
-        if giant:
-            comps.append({
-                "name": name,
-                "weakness": "Dominant scale (hard to disrupt)",
-                "url": giant["url"],
-                "market_fin": giant["market_fin"],
-                "product_intel": giant["product_intel"],
-                "technical_infra": giant["technical_infra"],
-                "sentiment": giant["sentiment"],
-                "marketing": giant["marketing"],
-                "kill_strategy": giant.get("kill_strategy", "Strategy synthesized.")
-            })
-        else:
-            # Generic fallback if not a known giant
-            comps.append({
-                "name": name, 
-                "weakness": "Legacy Infrastructure" if i == 0 else "Slow Innovation" if i == 1 else "Limited Focus", 
-                "url": url,
-                "market_fin": {"funding": "Series C/D", "share": "15-20%", "audience": "Enterprise/B2B"},
-                "product_intel": {"pricing": "Tiered SaaS", "features": "Core Dashboard, API Access", "ux_friction": "Modular but complex"},
-                "technical_infra": {"stack": "AWS/Java", "velocity": "Monthly Updates", "platform": "Cloud Native"},
-                "sentiment": {"complaints": "Pricing transparency", "trust_score": "4.2/5", "churn_drivers": "Legacy bloat"},
-                "marketing": {"acquisition": "SEO, Direct Sales", "seo_keywords": "Industry Leader", "social_status": "Active (LinkedIn)"},
-                "kill_strategy": f"Exploit {name}'s dependency on legacy tech by launching a faster, AI-first alternative targeting their high churn drivers."
-            })
+NOT_FOUND = "NOT_FOUND"
 
+def _honest_fallback(idea, mkt_url="#", mkt_src=""):
+    """
+    Returns an honest NOT_FOUND structure when the AI or search fails.
+    Never invents numbers. Frontend renders these as '—' / 'Data Not Available'.
+    """
     return {
-        "market": { 
-            "size": f"${unique_val}B", 
-            "forecast_tam": f"${unique_val}B", # Map size to forecast for safety
-            "current_tam": "Data unavailable", # Explicit trigger for math fallback
-            "growth": match[1], 
-            "confidence": "Analytic Baseline", 
-            "source_url": mkt_url if mkt_url and mkt_url != "#" else "https://www.statista.com", 
-            "source_name": professionalize_source(mkt_src),
-            "timing": { "label": "Peak Growth", "rationale": "Ideal window for entry as infrastructure costs stabilize." }
+        "market": {
+            "current_tam": NOT_FOUND,
+            "current_year": NOT_FOUND,
+            "forecast_tam": NOT_FOUND,
+            "forecast_year": NOT_FOUND,
+            "growth": NOT_FOUND,
+            "confidence": "Search Failed",
+            "source_url": mkt_url if mkt_url and mkt_url != "#" else "",
+            "source_name": mkt_src or "No source found",
+            "timing": {"label": NOT_FOUND, "rationale": "Insufficient data to determine market timing."}
         },
-        "monetization": { "model": "B2B SaaS (Usage-Based)", "strategy": "Align pricing with volume to capture scale." },
-        "competitors": comps,
-        "gen_ui": { "title": f"{idea} Strategist", "desc": "Enterprise Grade Intelligence", "feature": "Market Modeling" },
+        "monetization": {"model": NOT_FOUND, "strategy": NOT_FOUND},
+        "competitors": [],
+        "gen_ui": {"title": f"{idea}", "desc": "Analysis incomplete", "feature": NOT_FOUND},
         "god_mode": {
-            "macro_verdict": f"The '{idea}' sector is ripe for disruption if you target the slow-moving incumbents with a lean, AI-native stack.",
-            "swarm_summary": "Agents found high infrastructure costs in this sector, but identified a massive gap in lower-tier accessibility.",
-            "swot": { "strengths": ["High niche demand"], "weaknesses": ["Regulatory complexity"], "opportunities": ["AI Automation"], "threats": ["Big tech entry"] },
-            "risk_score": "Moderate"
+            "macro_verdict": "Search returned insufficient data to generate a verdict. Try a more specific idea description.",
+            "swarm_summary": "No competitor intelligence gathered.",
+            "swot": {"strengths": [], "weaknesses": [], "opportunities": [], "threats": []},
+            "risk_score": NOT_FOUND
         },
-        "dept_legal": ["Draft sector-specific liability disclaimers", "Review SOC2 compliance architecture", "Establish intellectual property moats", "Audit regulatory compliance requirements", "Draft data retention policies"],
-        "dept_product": ["Architect high-availability RAG pipeline", "Implement metered usage-billing logic", "Scale modular microservices cluster", "Optimize inference latency", "Build multi-modal capabilities"],
-        "dept_marketing": ["Execute high-signal LinkedIn direct-reach", "Deploy content-led SEO for niche intent", "Optimise high-intent conversion funnels", "Launch developer advocacy program", "Build enterprise case studies"],
-        "dept_finance": ["Manage high-leverage cloud infrastructure credits", "Model unit economics for scale-up", "Optimise inference cost-to-margin ratio", "Project runway for Series A", "Establish billing infrastructure"],
-        "strategy_log": {
-            "legal": ["$ checking SEC regulations...", "$ found high risk level."],
-            "product": ["$ auditing feature set...", "$ optimizing MVP scope..."],
-            "marketing": ["$ scanning GTM channels...", "$ found viral potential."],
-            "finance": ["$ analyzing unit economics...", "$ optimizing seed burn..."]
-        }
+        "dept_legal": [],
+        "dept_product": [],
+        "dept_marketing": [],
+        "dept_finance": [],
+        "strategy_log": {"legal": [], "product": [], "marketing": [], "finance": []}
     }
+
+
+def validate_and_sanitize(data: dict, source_context: str) -> dict:
+    """
+    Layer 3 validator: scans market fields and replaces any value that has
+    no matching evidence in the source context with NOT_FOUND.
+    Only applies to numeric market fields — text fields are left as-is.
+    """
+    market = data.get("market", {})
+    numeric_fields = ["current_tam", "forecast_tam", "growth"]
+
+    for field in numeric_fields:
+        val = market.get(field, "")
+        if not val or val == NOT_FOUND:
+            continue
+        # Extract the raw number from the value (e.g. "$15.5B" → "15.5")
+        digits = re.sub(r"[^\d\.]", "", str(val))
+        if not digits:
+            continue
+        # Check if this number (or a close variant) appears in the source text
+        # Strip trailing zeros for loose matching (15.5 matches "15.5" and "$15.5B")
+        if digits not in source_context and digits.rstrip("0").rstrip(".") not in source_context:
+            print(f"[VALIDATOR] '{field}={val}' not found in sources → marking NOT_FOUND")
+            market[field] = NOT_FOUND
+
+    data["market"] = market
+    return data
 
 # ============================================================================
 #  AI ENGINE (Aggressive & Stable)
@@ -437,27 +383,26 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 30)
         return None
 
 
-def call_gemini(prompt, model_id=None):
+def call_gemini(prompt, model_id=None, key_offset=0):
     """
-    Waterfall strategy:
-      1. Try PRIMARY_MODEL (gemini-2.5-flash) across all keys in _KEY_POOL
-         — exponential backoff: 1s → 2s → 4s between key switches
-      2. If all primary keys exhausted → fall back to SECONDARY_MODEL (gemini-2.5-flash-lite)
-         across all keys
-      3. If all secondary keys exhausted → return "{}"
-
-    model_id param is accepted for backwards compatibility but ignored;
-    callers should rely on the waterfall instead.
+    Waterfall strategy with key_offset for parallel call distribution.
+    key_offset: start from a different key so parallel calls don't collide.
+      1. Try PRIMARY_MODEL across all keys starting at key_offset
+      2. Fall back to SECONDARY_MODEL across all keys
+      3. Return "{}" if all fail
     """
     if not _KEY_POOL:
         print("[GEMINI] No API keys configured.")
         return "{}"
 
+    n = len(_KEY_POOL)
     for model in [PRIMARY_MODEL, SECONDARY_MODEL]:
-        for attempt, key in enumerate(_KEY_POOL):
-            wait = min(2 ** attempt, 8)          # 1s, 2s, 4s, 8s cap
+        # Rotate pool so this call starts at key_offset
+        rotated_pool = [_KEY_POOL[(key_offset + i) % n] for i in range(n)]
+        for attempt, key in enumerate(rotated_pool):
+            wait = min(2 ** attempt, 8)
             if attempt > 0:
-                print(f"[GEMINI] Backing off {wait}s before next key...")
+                print(f"[GEMINI] Backing off {wait}s before next key (offset={key_offset})...")
                 time.sleep(wait)
             result = _gemini_request(prompt, model, key)
             if result:
@@ -518,8 +463,7 @@ def audit_search_results(results_list, query):
     """
     
     try:
-        # USE THE ANALYST MODEL FOR AUDITING
-        raw_verdict = call_gemini(prompt)
+        raw_verdict = call_gemini(prompt, key_offset=2)
         valid_indices = clean_json(raw_verdict)
         
         if isinstance(valid_indices, list):
@@ -640,75 +584,92 @@ def classify_industry(idea: str) -> dict:
 # MAIN ENDPOINT
 # ============================================================================
 
+def swarm_research_comp(name):
+    """Parallel swarm research per competitor — uses DDG, no Gemini key needed."""
+    giant = get_giant_data(name)
+    if giant:
+        return f"\n--- {name} GROUND TRUTH ---\nData: {json.dumps(giant)}\n"
+
+    print(f"[SWARM] Researching: {name}...")
+    agents = {
+        "Headhunter": f"{name} CEO founders leadership management team",
+        "Accountant": f"{name} revenue valuation funding rounds investors financials",
+        "Engineer":   f"{name} tech stack infrastructure backend cloud",
+        "Spy":        f"{name} weaknesses complaints reviews SWOT trustpilot glassdoor",
+        "Strategist": f"{name} product roadmap future strategy expansion goals"
+    }
+    agent_results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {ex.submit(execute_search, q, 3): ag for ag, q in agents.items()}
+        for fut in concurrent.futures.as_completed(futures):
+            ag = futures[fut]
+            try:
+                res = fut.result()
+                agent_results[ag] = "\n".join([f"Source: {r['href']}\nSnippet: {r['body']}" for r in res])
+            except:
+                agent_results[ag] = "Search failed."
+
+    intel = f"\n--- {name} SWARM INTELLIGENCE REPORT ---\n"
+    for ag, data in agent_results.items():
+        intel += f"### {ag} Intelligence:\n{data}\n\n"
+    return intel
+
+
+def run_swarm(comp_names):
+    """Run swarm_research_comp for 3 competitors in parallel."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+        return list(ex.map(swarm_research_comp, comp_names[:3]))
+
+
+def _apply_audit(search_data, audited_objects):
+    """Update search_data in-place with audited results."""
+    if audited_objects:
+        parts = []
+        for i, res in enumerate(audited_objects[:5], 1):
+            parts.append(f"[SOURCE {i}]\nTitle: {res.get('title')}\nURL: {res.get('url')}\nContent: {res.get('content')}\n---")
+        search_data['raw_context'] = "\n\n".join(parts)
+        search_data['results_count'] = len(audited_objects)
+        search_data['top_source_url'] = audited_objects[0].get('url', '')
+        search_data['top_source_name'] = audited_objects[0].get('title', 'Market Source')
+    else:
+        print("[AI JUDGE] Rejected ALL sources.")
+        search_data['results_count'] = 0
+        search_data['raw_context'] = "No valid data found after audit."
+    return search_data
+
+
 @app.post("/analyze")
 async def analyze(req: IdeaRequest):
     idea = req.idea
-    
-    # === STEP 1: IDEA CLASSIFICATION (TRANSLATOR LAYER) ===
-    print(f"\n[BRAIN] [CLASSIFIER] Translating '{idea}' to industry terms...")
-    industry_data = classify_industry(idea)
-    search_query = industry_data.get("search_query", idea)
+    print(f"\n[BRAIN] Analyzing: '{idea}'")
+
+    # ── BATCH 1 (parallel): classify industry + competitor search ─────────────
+    print("[PARALLEL] Batch 1: classify_industry + comp search")
+    industry_data, (comp_prelim, _, _) = await asyncio.gather(
+        asyncio.to_thread(classify_industry, idea),          # Gemini key offset 0
+        asyncio.to_thread(search_web, idea, "competitor"),   # DDG — no Gemini
+    )
+    search_query  = industry_data.get("search_query", idea)
     industry_name = industry_data.get("industry_name", "Unknown")
-    print(f"[OK] [CLASSIFIER] Identified Sector: {industry_name}")
-    print(f"[TARGET] [CLASSIFIER] Professional Query: {search_query}")
+    print(f"[OK] Sector: {industry_name} | Query: {search_query}")
 
-    # === STEP 2: SEARCH GROUNDING (NEW) ===
-    print(f"\n[SEARCH] [SEARCH GROUNDING] Searching real market data for: {search_query}")
-    # Pass the TRANSLATED search query as the 'industry' parameter
-    search_data = await search_market_data(idea, search_query) 
-    print(f"[OK] [SEARCH GROUNDING] Found {search_data['results_count']} raw sources")
-    
-    # === STEP 2.5: AI AUDIT (THE JUDGE) ===
-    # Filter the raw results using the AI Judge
-    if search_data.get("source_objects"):
-        audited_objects = audit_search_results(search_data["source_objects"], search_query) # Changed search_term to search_query
-        
-        # If the Judge killed everything, fallback to raw (better than nothing) or empty?
-        # Let's trust the judge. If zero, we go to zero.
-        # But wait, we need to rebuild the 'raw_context' string for the main prompt.
-        
-        if audited_objects:
-             # Re-format the context string using ONLY audited results
-             # We can't import 'process_results' b/c circular import, but we can do a simple join here
-             # actually, search_data has 'raw_context' which is a string. We need to overwrite it.
-             
-             new_context_parts = []
-             for i, res in enumerate(audited_objects[:5], 1):
-                 new_context_parts.append(f"[SOURCE {i}]\nTitle: {res.get('title')}\nURL: {res.get('url')}\nContent: {res.get('content')}\n---")
-             
-             search_data['raw_context'] = "\n\n".join(new_context_parts)
-             search_data['results_count'] = len(audited_objects)
-             search_data['top_source_url'] = audited_objects[0].get('url', '')
-             search_data['top_source_name'] = audited_objects[0].get('title', 'Market Source')
-             
-             # Re-run prompt formatting ? No, format_search_results_for_prompt uses the dict.
-             # We just updated the dict in place.
-        else:
-             print(" [AI JUDGE] Rejected ALL sources. Falling back to empty.")
-             search_data['results_count'] = 0
-             search_data['raw_context'] = "No valid data found after audit."
+    # ── BATCH 2 (parallel): Tavily market search + extract competitor names ───
+    extract_prompt = (
+        f"Identify exactly the TOP 3 direct competitors from this text for '{idea}'. "
+        f"Return ONLY a JSON list of strings (e.g. [\"OpenAI\", \"Anthropic\", \"Google\"]). "
+        f"If no clear names, use major industry leaders in the sector. Text: {comp_prelim}"
+    )
+    print("[PARALLEL] Batch 2: market search + extract comp names")
+    search_data, comp_names_raw = await asyncio.gather(
+        search_market_data(idea, search_query),                            # Tavily async
+        asyncio.to_thread(call_gemini, extract_prompt, None, 1),           # Gemini key offset 1
+    )
+    print(f"[OK] Market search: {search_data['results_count']} sources")
 
-    # Extract source from search results (instead of DDG fallback)
-    mkt_url = search_data['top_source_url'] or "https://www.statista.com"
-    mkt_src = search_data['top_source_name'] or "Market Intelligence Report"
-    
-    # Format search results for prompt injection
-    grounded_context = format_search_results_for_prompt(search_data)
-    
-    print(f"\n Processing: {idea}")
-
-    # 1. FETCH PRELIM COMP DATA (Market data now comes from search_market_data)
-    comp_prelim, _, _ = search_web(idea, mode="competitor")
-
-    # 2. EXTRACT NAMES (Lightweight AI call with domain-extraction fallback)
-    extract_prompt = f"Identify exactly the TOP 3 direct competitors from this text for '{idea}'. Return ONLY a JSON list of strings (e.g. [\"OpenAI\", \"Anthropic\", \"Google\"]). If no clear names, use major industry leaders in the sector. Text: {comp_prelim}"
-    comp_names_raw = call_gemini(extract_prompt)
+    # Parse competitor names with URL fallback
     comp_names = clean_json(comp_names_raw)
-    
     if not isinstance(comp_names, list) or not comp_names:
-        print(" AI Name Extraction failed. Using Regex Fallback...")
         import urllib.parse
-        # Extract domains from text
         urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', comp_prelim)
         extracted = []
         for u in urls:
@@ -716,47 +677,23 @@ async def analyze(req: IdeaRequest):
                 domain = urllib.parse.urlparse(u if u.startswith('http') else 'http://'+u).netloc.replace('www.', '').split('.')[0].capitalize()
                 if domain and domain.lower() not in BANNED and domain not in extracted and len(domain) > 2:
                     extracted.append(domain)
-            except: continue
-            if len(extracted) >= 3: break
-        
+            except:
+                continue
+            if len(extracted) >= 3:
+                break
         comp_names = extracted if len(extracted) >= 3 else ["Industry Leader", "Global Player", "Innovation Rival"]
-    
-    # 3. SWARM RESEARCH (Parallel Agents)
-    def swarm_research_comp(name):
-        # Use Giant Intel if already known
-        giant = get_giant_data(name)
-        if giant:
-            return f"\n--- {name} GROUND TRUTH ---\nData: {json.dumps(giant)}\n"
-            
-        print(f" Swarm Researching: {name}...")
-        agents = {
-            "Headhunter": f"{name} CEO founders leadership management team",
-            "Accountant": f"{name} revenue valuation funding rounds investors financials",
-            "Engineer": f"{name} tech stack infrastructure backend cloud",
-            "Spy": f"{name} weaknesses complaints reviews SWOT trustpilot glassdoor",
-            "Strategist": f"{name} product roadmap future strategy expansion goals"
-        }
 
-        agent_results = {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as inner_executor:
-            future_to_agent = {inner_executor.submit(execute_search, query, 3): agent for agent, query in agents.items()}
-            for future in concurrent.futures.as_completed(future_to_agent):
-                agent = future_to_agent[future]
-                try:
-                    search_data = future.result()
-                    agent_results[agent] = "\n".join([f"Source: {r['href']}\nSnippet: {r['body']}" for r in search_data])
-                except:
-                    agent_results[agent] = "Searching failed for this agent."
+    # ── BATCH 3 (parallel): AI audit + swarm research ────────────────────────
+    print("[PARALLEL] Batch 3: audit sources + swarm research")
+    audited_objects, swarm_intel_list = await asyncio.gather(
+        asyncio.to_thread(audit_search_results, search_data.get("source_objects", []), search_query),  # Gemini key offset 2
+        asyncio.to_thread(run_swarm, comp_names),                                                       # DDG — no Gemini
+    )
 
-        swarm_intel = f"\n--- {name} SWARM INTELLIGENCE REPORT ---\n"
-        for agent, intel in agent_results.items():
-            swarm_intel += f"### {agent} Intelligence:\n{intel}\n\n"
-        
-        return swarm_intel
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        swarm_intel_list = list(executor.map(swarm_research_comp, comp_names[:3]))
-    
+    search_data = _apply_audit(search_data, audited_objects)
+    mkt_url = search_data['top_source_url'] or "https://www.statista.com"
+    mkt_src = search_data['top_source_name'] or "Market Intelligence Report"
+    grounded_context = format_search_results_for_prompt(search_data)
     swarm_intel_raw = "\n".join(swarm_intel_list)
     
     # 4. FINAL SYNTHESIS (Brain #1: Optimistic Validator)
@@ -781,22 +718,42 @@ async def analyze(req: IdeaRequest):
     """
 
     CRITICAL_RULES = f"""
+    ══════════════════════════════════════════════════════
+    HONESTY PROTOCOL — ZERO TOLERANCE FOR HALLUCINATION
+    ══════════════════════════════════════════════════════
+    RULE 0 — NOT_FOUND IS MANDATORY:
+    If a specific data point (TAM, CAGR, funding, pricing) is NOT explicitly stated
+    in the provided DATA SOURCES above, you MUST return the exact string "NOT_FOUND"
+    for that field. NEVER estimate, interpolate, or synthesize a number.
+    "NOT_FOUND" is not a failure — it is the correct, honest answer.
+
+    RULE 1 — NO MATH:
+    Do NOT calculate TAM by multiplying population × price. Do NOT derive CAGR
+    from two TAM numbers. Only use numbers that appear verbatim in the sources.
+
+    RULE 2 — NO SECTOR DEFAULTS:
+    Do NOT use generic sector benchmarks (e.g., "SaaS typically grows 20%").
+    Every number must be traceable to a sentence in the provided DATA SOURCES.
+
+    RULE 3 — COMPETITOR DATA:
+    For each competitor, only fill fields where you have direct evidence from
+    the COMPETITOR INTEL above. Use "NOT_FOUND" for unknown funding, stack, pricing.
+    ══════════════════════════════════════════════════════
+
     CRITICAL RULES (STRATEGIC INTELLIGENCE MODE):
-    0. **EXTRACTION FIRST**: The REAL-TIME MARKET DATA above contains verified numbers. Extract them EXACTLY. DO NOT IGNORE THE SEARCH RESULTS.
-    1. MARKET SIZE (THE COMPONENT): Extract BOTH the CURRENT TAM (2025) and the FORECAST TAM (2030) from the SEARCH RESULTS above. 
-       - MANDATORY: You MUST provide two distinct years to show the growth narrative (Today vs. Tomorrow).
-       - current_tam: Value for 2024 or 2025.
-       - forecast_tam: Value for 2030 or 2032.
-       - FORMAT: Strictly "$XX.XB" or "$XXB".
-    2. GROWTH (CAGR): Extract CAGR percentage FROM THE SEARCH RESULTS. This is vital to bridge the two TAM numbers.
-    3. COMPETITORS: Analyze 3 competitors. Focus on their success and audience.
-    4. ACTION PLAN (DEPARTMENTAL PRIORITIES): 
-       - NO "Startup 101" Admin: Never suggest generic tasks like "Register LLC," "Open Bank Account," "Setup QuickBooks," "Buy Domain," or "Setup Email."
-       - NO Vendor Shilling: Do not recommend specific tools (like "AWS," "Azure," "Jira," "HubSpot") unless they are the industry standard. Use functional terms like "Cloud Infrastructure Credits," "Agile Project Management," or "CRM Pipeline."
-       - Be Industry-Specific: The advice must be hyper-relevant to the specific domain of "{idea}". Focus on "Strategic Moves" (e.g., "Implement usage-based billing logic") rather than "low-level chores" (e.g., "Sign up for Stripe").
-       - OUTPUT: Create exactly 5 short, punchy priority titles (max 6 words each) per department.
-    5. MONETIZATION: Recommend a specific business model (e.g. "Usage-Based SaaS").
-    6. MARKET TIMING: Label the phase ("Early Adopter", "Peak Growth", or "Saturation") with 1 sentence rationale.
+    0. **EXTRACTION FIRST**: The REAL-TIME MARKET DATA above contains verified numbers. Extract them EXACTLY.
+    1. MARKET SIZE: Extract BOTH current_tam (2024/2025) AND forecast_tam (2030/2032) FROM THE SOURCES.
+       - If only one value is found, set the other to "NOT_FOUND".
+       - FORMAT for found values: strictly "$XX.XB" or "$XXB".
+    2. GROWTH (CAGR): Extract CAGR percentage FROM THE SEARCH RESULTS. If not found → "NOT_FOUND".
+    3. COMPETITORS: Analyze up to 3 competitors. Only include fields you have evidence for.
+    4. ACTION PLAN (DEPARTMENTAL PRIORITIES):
+       - NO "Startup 101" Admin: Never suggest "Register LLC," "Open Bank Account," "Buy Domain."
+       - NO Vendor Shilling: Use functional terms, not brand names like "AWS" or "Jira."
+       - Be Industry-Specific: Advice must be hyper-relevant to "{idea}".
+       - OUTPUT: Exactly 5 short, punchy priority titles (max 6 words each) per department.
+    5. MONETIZATION: Recommend a specific business model. Base it on the industry evidence.
+    6. MARKET TIMING: Label the phase with 1 sentence rationale from the data.
     
     JSON FORMAT:
     {{
@@ -854,55 +811,45 @@ async def analyze(req: IdeaRequest):
     """
     
     try:
-        raw = call_gemini(ANALYZE_PROMPT)
+        raw = call_gemini(ANALYZE_PROMPT, key_offset=3)
         data = clean_json(raw)
-        
-        if not data or not data.get("market"): 
-            # DYNAMIC FALLBACK (Avoids identical 'Data Unavailable' results)
-            print(f" AI Failure. Generating Dynamic Fallback for: {idea}")
-            fallback = generate_dynamic_fallback(idea, mkt_url, mkt_src)
-            # Apply Math Fallback to Fallback Data
-            if fallback and "market" in fallback:
-                 fallback["market"] = calculate_missing_tam(fallback["market"])
-            return fallback
-        
-        # 3. CLEANUP & CITATION FALLBACK
+
+        if not data or not data.get("market"):
+            print(f"[HONEST] AI returned no data for: {idea}")
+            return _honest_fallback(idea, mkt_url, mkt_src)
+
+        # Fix source fields
         m_data = data.get("market", {})
-        if not m_data.get("source_url") or m_data.get("source_url") == "{mkt_url}":
-            m_data["source_url"] = mkt_url if mkt_url and mkt_url != "#" else "https://www.statista.com"
-        
+        if not m_data.get("source_url") or "{mkt_url}" in str(m_data.get("source_url", "")):
+            m_data["source_url"] = mkt_url if mkt_url and mkt_url != "#" else ""
         m_data["source_name"] = professionalize_source(m_data.get("source_name", mkt_src))
 
-        data["market"]["size"] = extract_precise_value(data["market"]["size"])
-        data["market"]["growth"] = clean_growth(data["market"]["growth"])
-
-        # 4. POST-PROCESS (Inject Real Giant Data to eliminate AI placeholders)
+        # Inject verified Giant Intel for known competitors
         for comp in data.get("competitors", []):
             giant = get_giant_data(comp["name"])
             if giant:
-                print(f" Injecting Real Giant Data for: {comp['name']}")
+                print(f"[GIANT] Injecting verified data for: {comp['name']}")
                 comp["url"] = giant["url"]
                 comp["market_fin"] = giant["market_fin"]
                 comp["product_intel"] = giant["product_intel"]
                 comp["technical_infra"] = giant["technical_infra"]
                 comp["sentiment"] = giant["sentiment"]
-                comp["marketing"] = giant.get("marketing", giant.get("acquisition", comp["marketing"]))
-                comp["kill_strategy"] = giant.get("kill_strategy", comp.get("kill_strategy", "Strategy synthesized."))
-        
-        # 5. FINAL RETURN
-        # NEW: Math Fallback to ensure complete Growth Story
-        if data and "market" in data:
-            data["market"] = calculate_missing_tam(data["market"])
+                comp["marketing"] = giant.get("marketing", comp.get("marketing", {}))
+                comp["kill_strategy"] = giant.get("kill_strategy", comp.get("kill_strategy", NOT_FOUND))
 
-        data["idea"] = idea  # Inject search context for Frontend
+        # Math fallback: calculate current_tam from forecast + CAGR if missing
+        # (this is deterministic math, not hallucination)
+        data["market"] = calculate_missing_tam(data["market"])
+
+        # Layer 3: validate numeric fields against source text
+        data = validate_and_sanitize(data, grounded_context)
+
+        data["idea"] = idea
         return data
 
     except Exception as e:
-        print(f" UNEXPECTED FAILURE: {e}")
-        fallback = generate_dynamic_fallback(idea, mkt_url, mkt_src)
-        if fallback and "market" in fallback:
-             fallback["market"] = calculate_missing_tam(fallback["market"])
-        return fallback
+        print(f"[HONEST] Unexpected failure: {e}")
+        return _honest_fallback(idea, mkt_url, mkt_src)
 
 
 
