@@ -18,6 +18,19 @@ import { RealData, Competitor, DSInsightsData } from '../../types';
 import ForensicReport from '../../components/ForensicReport';
 import DSInsights from '../../components/DSInsights';
 
+// --- HONEST DATA HELPERS ---
+const NF = "NOT_FOUND";
+const isNF = (v: any) => !v || v === NF || String(v).toLowerCase().includes("not_found");
+// fmt: renders a value or a styled "—" badge when data wasn't found
+const fmt = (v: any, fallback = "—") => isNF(v) ? fallback : v;
+const DataBadge = () => (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-500 border border-slate-700">
+        DATA NOT AVAILABLE
+    </span>
+);
+const FmtValue = ({ v, className = "" }: { v: any; className?: string }) =>
+    isNF(v) ? <DataBadge /> : <span className={className}>{v}</span>;
+
 // --- SUB-COMPONENTS FOR 10/10 UX ---
 
 const MarketGrowthChart = ({ currentTam, forecastTam, growth, year }: { currentTam: string, forecastTam: string, growth: string, year: string }) => {
@@ -534,17 +547,17 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                 <div className="grid grid-cols-2 gap-6">
                                     <div>
                                         <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50">TAM ({data.market.current_year || "2024/25"})</div>
-                                        <div className="text-2xl md:text-3xl font-black text-slate-400 tracking-tighter">{data.market.current_tam || "N/A"}</div>
+                                        <FmtValue v={data.market.current_tam} className="text-2xl md:text-3xl font-black text-slate-400 tracking-tighter" />
                                     </div>
                                     <div>
                                         <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50">TAM ({data.market.forecast_year || "2030"})</div>
-                                        <div className="text-4xl md:text-5xl font-black text-white tracking-tighter">{data.market.forecast_tam || data.market.size}</div>
+                                        <FmtValue v={data.market.forecast_tam || data.market.size} className="text-4xl md:text-5xl font-black text-white tracking-tighter" />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
                                         <div className="text-[10px] text-slate-500 font-bold uppercase mb-1 flex items-center gap-2"><TrendingUp className="w-3 h-3 text-green-400"/> Growth</div>
-                                        <div className="text-green-400 font-bold text-sm md:text-base">CAGR {data.market.growth}</div>
+                                        <div className="text-green-400 font-bold text-sm md:text-base">{isNF(data.market.growth) ? <DataBadge /> : `CAGR ${data.market.growth}`}</div>
                                     </div>
                                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
                                         <div className="text-[10px] text-slate-500 font-bold uppercase mb-1 flex items-center gap-2"><Info className="w-3 h-3 text-blue-400"/> Confidence</div>
@@ -554,8 +567,8 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                 {data.monetization && (
                                     <div className="p-4 md:p-6 rounded-2xl bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-blue-500/20">
                                         <div className="text-[10px] text-blue-400 font-black uppercase tracking-[0.2em] mb-2">Revenue Strategy</div>
-                                        <div className="text-white font-bold text-base md:text-lg mb-1">{data.monetization.model}</div>
-                                        <div className="text-slate-400 text-[11px] md:text-xs leading-relaxed font-medium">{data.monetization.strategy}</div>
+                                        <div className="text-white font-bold text-base md:text-lg mb-1"><FmtValue v={data.monetization.model} /></div>
+                                        <div className="text-slate-400 text-[11px] md:text-xs leading-relaxed font-medium"><FmtValue v={data.monetization.strategy} /></div>
                                     </div>
                                 )}
                             </div>
