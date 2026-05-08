@@ -250,16 +250,26 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
-                windowWidth: 800
+                windowWidth: 800,
+                scrollY: 0,
+                height: reportRef.current.scrollHeight,
             });
 
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
-            const imgProps = pdf.getImageProperties(imgData);
             const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            const pdfPageHeight = pdf.internal.pageSize.getHeight();
+            const scaledHeight = (canvas.height * pdfWidth) / canvas.width;
 
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            let position = 0;
+            let page = 0;
+            while (position < scaledHeight) {
+                if (page > 0) pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, -position, pdfWidth, scaledHeight);
+                position += pdfPageHeight;
+                page++;
+            }
+
             pdf.save(`LaunchMint_Analysis_${input.replace(/\s+/g, '_')}.pdf`);
         } catch (err) {
             console.error("PDF Gen Error:", err);
