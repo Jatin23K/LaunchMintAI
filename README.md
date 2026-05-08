@@ -6,6 +6,7 @@ LaunchMintAI is a production-grade research engine combining dual-layer search g
 
 ![LaunchMintAI Banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-launch--mint--ai.vercel.app-brightgreen)](https://launch-mint-ai.vercel.app)
 [![DS Eval Pipeline](https://github.com/Jatin23K/LaunchMintAI/actions/workflows/ds-eval.yml/badge.svg)](https://github.com/Jatin23K/LaunchMintAI/actions/workflows/ds-eval.yml)
 ![Golden Test](https://img.shields.io/badge/Golden%20Test-50%2F50%20100%25-brightgreen)
 ![AUC-ROC](https://img.shields.io/badge/AUC--ROC-0.8170-blue)
