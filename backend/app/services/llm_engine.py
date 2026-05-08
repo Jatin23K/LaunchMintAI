@@ -26,8 +26,26 @@ from services.market_search import search_market_data, format_search_results_for
 import app.ds.pipeline as ds_pipeline
 
 load_dotenv()
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY_1")
-API_KEY = GEMINI_API_KEY
+
+# ── Key Pool (6 keys across 6 Gmail accounts) ─────────────────────────────
+_KEY_POOL = [
+    v for v in [
+        os.environ.get("GEMINI_API_KEY_1") or os.environ.get("GEMINI_API_KEY"),
+        os.environ.get("GEMINI_API_KEY_2"),
+        os.environ.get("GEMINI_API_KEY_3"),
+        os.environ.get("GEMINI_API_KEY_4"),
+        os.environ.get("GEMINI_API_KEY_5"),
+        os.environ.get("GEMINI_API_KEY_6"),
+    ] if v
+]
+
+# ── Model Waterfall ────────────────────────────────────────────────────────
+# Primary: gemini-2.5-flash  →  Secondary: gemini-2.5-flash-lite
+PRIMARY_MODEL   = "gemini-2.5-flash"
+SECONDARY_MODEL = "gemini-2.5-flash-lite"
+
+# Legacy alias kept so old call sites don't break
+API_KEY = _KEY_POOL[0] if _KEY_POOL else None
 
 app = FastAPI()
 
@@ -397,26 +415,58 @@ def generate_dynamic_fallback(idea, mkt_url="#", mkt_src="Industry Benchmark"):
 #  AI ENGINE (Aggressive & Stable)
 # ============================================================================
 
-def call_gemini(prompt, model_id="gemini-1.5-flash"):
-    # ROTATE MODELS (Default or Specific)
-    url = f"https://generativelanguage.googleapis.com/v1/models/{model_id}:generateContent?key={API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    payload = { "contents": [{ "parts": [{"text": prompt}] }] }
-    
-    # EXTREME SPEED RETRY (Targeting < 10s latency for 95%+ Grade)
-    for i in range(2):
-        try:
-            res = requests.post(url, headers=headers, json=payload, timeout=25)
-            if res.status_code == 200:
-                return res.json()["candidates"][0]["content"]["parts"][0]["text"]
-            else:
-                print(f" AI API Error {res.status_code}: {res.text}")
-                if res.status_code == 429:
-                    print(f" Quota Error (429). Waiting 2s...")
-                    time.sleep(2)
-        except Exception as e:
-            print(f" AI Request Exception: {e}")
-            time.sleep(1)
+def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 30) -> str | None:
+    """Single attempt against one model + one key. Returns text or None."""
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model_id}:generateContent?key={api_key}"
+    )
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    try:
+        res = requests.post(url, headers={"Content-Type": "application/json"},
+                            json=payload, timeout=timeout)
+        if res.status_code == 200:
+            return res.json()["candidates"][0]["content"]["parts"][0]["text"]
+        if res.status_code == 429:
+            print(f"[GEMINI] 429 rate-limit — model={model_id} key=...{api_key[-6:]}")
+            return None
+        print(f"[GEMINI] HTTP {res.status_code} — model={model_id}: {res.text[:120]}")
+        return None
+    except Exception as e:
+        print(f"[GEMINI] Exception — model={model_id}: {e}")
+        return None
+
+
+def call_gemini(prompt, model_id=None):
+    """
+    Waterfall strategy:
+      1. Try PRIMARY_MODEL (gemini-2.5-flash) across all keys in _KEY_POOL
+         — exponential backoff: 1s → 2s → 4s between key switches
+      2. If all primary keys exhausted → fall back to SECONDARY_MODEL (gemini-2.5-flash-lite)
+         across all keys
+      3. If all secondary keys exhausted → return "{}"
+
+    model_id param is accepted for backwards compatibility but ignored;
+    callers should rely on the waterfall instead.
+    """
+    if not _KEY_POOL:
+        print("[GEMINI] No API keys configured.")
+        return "{}"
+
+    for model in [PRIMARY_MODEL, SECONDARY_MODEL]:
+        for attempt, key in enumerate(_KEY_POOL):
+            wait = min(2 ** attempt, 8)          # 1s, 2s, 4s, 8s cap
+            if attempt > 0:
+                print(f"[GEMINI] Backing off {wait}s before next key...")
+                time.sleep(wait)
+            result = _gemini_request(prompt, model, key)
+            if result:
+                if model == SECONDARY_MODEL:
+                    print(f"[GEMINI] Serving via fallback model: {SECONDARY_MODEL}")
+                return result
+        print(f"[GEMINI] All keys exhausted for {model} — escalating to next tier...")
+
+    print("[GEMINI] All models and keys failed. Returning empty.")
     return "{}"
 
 def clean_json(text):
@@ -469,7 +519,7 @@ def audit_search_results(results_list, query):
     
     try:
         # USE THE ANALYST MODEL FOR AUDITING
-        raw_verdict = call_gemini(prompt, model_id="gemini-3-flash-preview")
+        raw_verdict = call_gemini(prompt)
         valid_indices = clean_json(raw_verdict)
         
         if isinstance(valid_indices, list):
@@ -574,7 +624,7 @@ def classify_industry(idea: str) -> dict:
     Input: "{idea}"
     """
     # USE THE FAST MODEL FOR CLASSIFICATION
-    raw = call_gemini(prompt, model_id="gemini-1.5-flash")
+    raw = call_gemini(prompt)
     data = clean_json(raw)
     if data: return data
     
@@ -652,7 +702,7 @@ async def analyze(req: IdeaRequest):
 
     # 2. EXTRACT NAMES (Lightweight AI call with domain-extraction fallback)
     extract_prompt = f"Identify exactly the TOP 3 direct competitors from this text for '{idea}'. Return ONLY a JSON list of strings (e.g. [\"OpenAI\", \"Anthropic\", \"Google\"]). If no clear names, use major industry leaders in the sector. Text: {comp_prelim}"
-    comp_names_raw = call_gemini(extract_prompt, model_id="gemini-flash-lite-latest")
+    comp_names_raw = call_gemini(extract_prompt)
     comp_names = clean_json(comp_names_raw)
     
     if not isinstance(comp_names, list) or not comp_names:
