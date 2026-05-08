@@ -4,8 +4,6 @@
 
 LaunchMintAI is a production-grade research engine combining dual-layer search grounding, parallel agentic analysis, and an applied ML intelligence layer to validate startup ideas before a single line of product code is written.
 
-![LaunchMintAI Banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
-
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-launch--mint--ai.vercel.app-brightgreen)](https://launch-mint-ai.vercel.app)
 [![DS Eval Pipeline](https://github.com/Jatin23K/LaunchMintAI/actions/workflows/ds-eval.yml/badge.svg)](https://github.com/Jatin23K/LaunchMintAI/actions/workflows/ds-eval.yml)
 ![Golden Test](https://img.shields.io/badge/Golden%20Test-50%2F50%20100%25-brightgreen)
@@ -124,7 +122,7 @@ backend/app/ds/eval/
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- [Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
+- - Gemini API key (free tier works)
 - [Tavily API key](https://tavily.com) (free tier: 1,000 searches/month)
 
 ### Backend
