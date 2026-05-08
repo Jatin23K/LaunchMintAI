@@ -10,6 +10,7 @@ import json
 import requests
 import re
 import time
+import asyncio
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -437,27 +438,26 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 30)
         return None
 
 
-def call_gemini(prompt, model_id=None):
+def call_gemini(prompt, model_id=None, key_offset=0):
     """
-    Waterfall strategy:
-      1. Try PRIMARY_MODEL (gemini-2.5-flash) across all keys in _KEY_POOL
-         — exponential backoff: 1s → 2s → 4s between key switches
-      2. If all primary keys exhausted → fall back to SECONDARY_MODEL (gemini-2.5-flash-lite)
-         across all keys
-      3. If all secondary keys exhausted → return "{}"
-
-    model_id param is accepted for backwards compatibility but ignored;
-    callers should rely on the waterfall instead.
+    Waterfall strategy with key_offset for parallel call distribution.
+    key_offset: start from a different key so parallel calls don't collide.
+      1. Try PRIMARY_MODEL across all keys starting at key_offset
+      2. Fall back to SECONDARY_MODEL across all keys
+      3. Return "{}" if all fail
     """
     if not _KEY_POOL:
         print("[GEMINI] No API keys configured.")
         return "{}"
 
+    n = len(_KEY_POOL)
     for model in [PRIMARY_MODEL, SECONDARY_MODEL]:
-        for attempt, key in enumerate(_KEY_POOL):
-            wait = min(2 ** attempt, 8)          # 1s, 2s, 4s, 8s cap
+        # Rotate pool so this call starts at key_offset
+        rotated_pool = [_KEY_POOL[(key_offset + i) % n] for i in range(n)]
+        for attempt, key in enumerate(rotated_pool):
+            wait = min(2 ** attempt, 8)
             if attempt > 0:
-                print(f"[GEMINI] Backing off {wait}s before next key...")
+                print(f"[GEMINI] Backing off {wait}s before next key (offset={key_offset})...")
                 time.sleep(wait)
             result = _gemini_request(prompt, model, key)
             if result:
@@ -518,8 +518,7 @@ def audit_search_results(results_list, query):
     """
     
     try:
-        # USE THE ANALYST MODEL FOR AUDITING
-        raw_verdict = call_gemini(prompt)
+        raw_verdict = call_gemini(prompt, key_offset=2)
         valid_indices = clean_json(raw_verdict)
         
         if isinstance(valid_indices, list):
@@ -640,75 +639,92 @@ def classify_industry(idea: str) -> dict:
 # MAIN ENDPOINT
 # ============================================================================
 
+def swarm_research_comp(name):
+    """Parallel swarm research per competitor — uses DDG, no Gemini key needed."""
+    giant = get_giant_data(name)
+    if giant:
+        return f"\n--- {name} GROUND TRUTH ---\nData: {json.dumps(giant)}\n"
+
+    print(f"[SWARM] Researching: {name}...")
+    agents = {
+        "Headhunter": f"{name} CEO founders leadership management team",
+        "Accountant": f"{name} revenue valuation funding rounds investors financials",
+        "Engineer":   f"{name} tech stack infrastructure backend cloud",
+        "Spy":        f"{name} weaknesses complaints reviews SWOT trustpilot glassdoor",
+        "Strategist": f"{name} product roadmap future strategy expansion goals"
+    }
+    agent_results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {ex.submit(execute_search, q, 3): ag for ag, q in agents.items()}
+        for fut in concurrent.futures.as_completed(futures):
+            ag = futures[fut]
+            try:
+                res = fut.result()
+                agent_results[ag] = "\n".join([f"Source: {r['href']}\nSnippet: {r['body']}" for r in res])
+            except:
+                agent_results[ag] = "Search failed."
+
+    intel = f"\n--- {name} SWARM INTELLIGENCE REPORT ---\n"
+    for ag, data in agent_results.items():
+        intel += f"### {ag} Intelligence:\n{data}\n\n"
+    return intel
+
+
+def run_swarm(comp_names):
+    """Run swarm_research_comp for 3 competitors in parallel."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+        return list(ex.map(swarm_research_comp, comp_names[:3]))
+
+
+def _apply_audit(search_data, audited_objects):
+    """Update search_data in-place with audited results."""
+    if audited_objects:
+        parts = []
+        for i, res in enumerate(audited_objects[:5], 1):
+            parts.append(f"[SOURCE {i}]\nTitle: {res.get('title')}\nURL: {res.get('url')}\nContent: {res.get('content')}\n---")
+        search_data['raw_context'] = "\n\n".join(parts)
+        search_data['results_count'] = len(audited_objects)
+        search_data['top_source_url'] = audited_objects[0].get('url', '')
+        search_data['top_source_name'] = audited_objects[0].get('title', 'Market Source')
+    else:
+        print("[AI JUDGE] Rejected ALL sources.")
+        search_data['results_count'] = 0
+        search_data['raw_context'] = "No valid data found after audit."
+    return search_data
+
+
 @app.post("/analyze")
 async def analyze(req: IdeaRequest):
     idea = req.idea
-    
-    # === STEP 1: IDEA CLASSIFICATION (TRANSLATOR LAYER) ===
-    print(f"\n[BRAIN] [CLASSIFIER] Translating '{idea}' to industry terms...")
-    industry_data = classify_industry(idea)
-    search_query = industry_data.get("search_query", idea)
+    print(f"\n[BRAIN] Analyzing: '{idea}'")
+
+    # ── BATCH 1 (parallel): classify industry + competitor search ─────────────
+    print("[PARALLEL] Batch 1: classify_industry + comp search")
+    industry_data, (comp_prelim, _, _) = await asyncio.gather(
+        asyncio.to_thread(classify_industry, idea),          # Gemini key offset 0
+        asyncio.to_thread(search_web, idea, "competitor"),   # DDG — no Gemini
+    )
+    search_query  = industry_data.get("search_query", idea)
     industry_name = industry_data.get("industry_name", "Unknown")
-    print(f"[OK] [CLASSIFIER] Identified Sector: {industry_name}")
-    print(f"[TARGET] [CLASSIFIER] Professional Query: {search_query}")
+    print(f"[OK] Sector: {industry_name} | Query: {search_query}")
 
-    # === STEP 2: SEARCH GROUNDING (NEW) ===
-    print(f"\n[SEARCH] [SEARCH GROUNDING] Searching real market data for: {search_query}")
-    # Pass the TRANSLATED search query as the 'industry' parameter
-    search_data = await search_market_data(idea, search_query) 
-    print(f"[OK] [SEARCH GROUNDING] Found {search_data['results_count']} raw sources")
-    
-    # === STEP 2.5: AI AUDIT (THE JUDGE) ===
-    # Filter the raw results using the AI Judge
-    if search_data.get("source_objects"):
-        audited_objects = audit_search_results(search_data["source_objects"], search_query) # Changed search_term to search_query
-        
-        # If the Judge killed everything, fallback to raw (better than nothing) or empty?
-        # Let's trust the judge. If zero, we go to zero.
-        # But wait, we need to rebuild the 'raw_context' string for the main prompt.
-        
-        if audited_objects:
-             # Re-format the context string using ONLY audited results
-             # We can't import 'process_results' b/c circular import, but we can do a simple join here
-             # actually, search_data has 'raw_context' which is a string. We need to overwrite it.
-             
-             new_context_parts = []
-             for i, res in enumerate(audited_objects[:5], 1):
-                 new_context_parts.append(f"[SOURCE {i}]\nTitle: {res.get('title')}\nURL: {res.get('url')}\nContent: {res.get('content')}\n---")
-             
-             search_data['raw_context'] = "\n\n".join(new_context_parts)
-             search_data['results_count'] = len(audited_objects)
-             search_data['top_source_url'] = audited_objects[0].get('url', '')
-             search_data['top_source_name'] = audited_objects[0].get('title', 'Market Source')
-             
-             # Re-run prompt formatting ? No, format_search_results_for_prompt uses the dict.
-             # We just updated the dict in place.
-        else:
-             print(" [AI JUDGE] Rejected ALL sources. Falling back to empty.")
-             search_data['results_count'] = 0
-             search_data['raw_context'] = "No valid data found after audit."
+    # ── BATCH 2 (parallel): Tavily market search + extract competitor names ───
+    extract_prompt = (
+        f"Identify exactly the TOP 3 direct competitors from this text for '{idea}'. "
+        f"Return ONLY a JSON list of strings (e.g. [\"OpenAI\", \"Anthropic\", \"Google\"]). "
+        f"If no clear names, use major industry leaders in the sector. Text: {comp_prelim}"
+    )
+    print("[PARALLEL] Batch 2: market search + extract comp names")
+    search_data, comp_names_raw = await asyncio.gather(
+        search_market_data(idea, search_query),                            # Tavily async
+        asyncio.to_thread(call_gemini, extract_prompt, None, 1),           # Gemini key offset 1
+    )
+    print(f"[OK] Market search: {search_data['results_count']} sources")
 
-    # Extract source from search results (instead of DDG fallback)
-    mkt_url = search_data['top_source_url'] or "https://www.statista.com"
-    mkt_src = search_data['top_source_name'] or "Market Intelligence Report"
-    
-    # Format search results for prompt injection
-    grounded_context = format_search_results_for_prompt(search_data)
-    
-    print(f"\n Processing: {idea}")
-
-    # 1. FETCH PRELIM COMP DATA (Market data now comes from search_market_data)
-    comp_prelim, _, _ = search_web(idea, mode="competitor")
-
-    # 2. EXTRACT NAMES (Lightweight AI call with domain-extraction fallback)
-    extract_prompt = f"Identify exactly the TOP 3 direct competitors from this text for '{idea}'. Return ONLY a JSON list of strings (e.g. [\"OpenAI\", \"Anthropic\", \"Google\"]). If no clear names, use major industry leaders in the sector. Text: {comp_prelim}"
-    comp_names_raw = call_gemini(extract_prompt)
+    # Parse competitor names with URL fallback
     comp_names = clean_json(comp_names_raw)
-    
     if not isinstance(comp_names, list) or not comp_names:
-        print(" AI Name Extraction failed. Using Regex Fallback...")
         import urllib.parse
-        # Extract domains from text
         urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', comp_prelim)
         extracted = []
         for u in urls:
@@ -716,47 +732,23 @@ async def analyze(req: IdeaRequest):
                 domain = urllib.parse.urlparse(u if u.startswith('http') else 'http://'+u).netloc.replace('www.', '').split('.')[0].capitalize()
                 if domain and domain.lower() not in BANNED and domain not in extracted and len(domain) > 2:
                     extracted.append(domain)
-            except: continue
-            if len(extracted) >= 3: break
-        
+            except:
+                continue
+            if len(extracted) >= 3:
+                break
         comp_names = extracted if len(extracted) >= 3 else ["Industry Leader", "Global Player", "Innovation Rival"]
-    
-    # 3. SWARM RESEARCH (Parallel Agents)
-    def swarm_research_comp(name):
-        # Use Giant Intel if already known
-        giant = get_giant_data(name)
-        if giant:
-            return f"\n--- {name} GROUND TRUTH ---\nData: {json.dumps(giant)}\n"
-            
-        print(f" Swarm Researching: {name}...")
-        agents = {
-            "Headhunter": f"{name} CEO founders leadership management team",
-            "Accountant": f"{name} revenue valuation funding rounds investors financials",
-            "Engineer": f"{name} tech stack infrastructure backend cloud",
-            "Spy": f"{name} weaknesses complaints reviews SWOT trustpilot glassdoor",
-            "Strategist": f"{name} product roadmap future strategy expansion goals"
-        }
 
-        agent_results = {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as inner_executor:
-            future_to_agent = {inner_executor.submit(execute_search, query, 3): agent for agent, query in agents.items()}
-            for future in concurrent.futures.as_completed(future_to_agent):
-                agent = future_to_agent[future]
-                try:
-                    search_data = future.result()
-                    agent_results[agent] = "\n".join([f"Source: {r['href']}\nSnippet: {r['body']}" for r in search_data])
-                except:
-                    agent_results[agent] = "Searching failed for this agent."
+    # ── BATCH 3 (parallel): AI audit + swarm research ────────────────────────
+    print("[PARALLEL] Batch 3: audit sources + swarm research")
+    audited_objects, swarm_intel_list = await asyncio.gather(
+        asyncio.to_thread(audit_search_results, search_data.get("source_objects", []), search_query),  # Gemini key offset 2
+        asyncio.to_thread(run_swarm, comp_names),                                                       # DDG — no Gemini
+    )
 
-        swarm_intel = f"\n--- {name} SWARM INTELLIGENCE REPORT ---\n"
-        for agent, intel in agent_results.items():
-            swarm_intel += f"### {agent} Intelligence:\n{intel}\n\n"
-        
-        return swarm_intel
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        swarm_intel_list = list(executor.map(swarm_research_comp, comp_names[:3]))
-    
+    search_data = _apply_audit(search_data, audited_objects)
+    mkt_url = search_data['top_source_url'] or "https://www.statista.com"
+    mkt_src = search_data['top_source_name'] or "Market Intelligence Report"
+    grounded_context = format_search_results_for_prompt(search_data)
     swarm_intel_raw = "\n".join(swarm_intel_list)
     
     # 4. FINAL SYNTHESIS (Brain #1: Optimistic Validator)
@@ -854,7 +846,7 @@ async def analyze(req: IdeaRequest):
     """
     
     try:
-        raw = call_gemini(ANALYZE_PROMPT)
+        raw = call_gemini(ANALYZE_PROMPT, key_offset=3)   # key offset 3 — fresh key for synthesis
         data = clean_json(raw)
         
         if not data or not data.get("market"): 
