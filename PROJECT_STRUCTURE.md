@@ -10,13 +10,20 @@ LaunchMintAI/
 ├── backend/                          # FastAPI Backend
 │   ├── .env.example                  # Template — copy to .env and fill keys
 │   ├── requirements.txt              # Pinned dependencies
+│   ├── requirements_ds.txt           # DS-specific dependencies (XGBoost, VADER, etc.)
 │   ├── railway.toml                  # Railway deployment config
 │   └── app/
-│       ├── main.py                   # FastAPI entry point + CORS + extension registry
+│       ├── main.py                   # FastAPI entry point + CORS + all endpoints
+│       │
+│       ├── models/
+│       │   └── schemas.py            # Pydantic request/response models
 │       │
 │       ├── services/                 # Core Intelligence Services
-│       │   ├── llm_engine.py         # Gemini 2.0 Flash + multi-key rotation + /analyze endpoint
-│       │   ├── market_search.py      # Tavily waterfall search strategy
+│       │   ├── __init__.py
+│       │   ├── llm_engine.py         # Gemini Flash + multi-key rotation + all endpoints
+│       │   │                         # /analyze, /war_room, /vc_roast, /pitch_forge, /compare
+│       │   ├── market_search.py      # Tavily 3-tier waterfall search
+│       │   ├── database.py           # SQLite + SQLModel persistence
 │       │   ├── vector_db.py          # ChromaDB long-term intelligence
 │       │   ├── ocr_engine.py         # Document OCR pipeline
 │       │   └── scraper_engine.py     # Web scraping layer
@@ -43,9 +50,9 @@ LaunchMintAI/
 │       │
 │       └── ds/                       # DS Intelligence Layer ★
 │           ├── classifier.py         # XGBoost survival classifier (train + predict)
-│           ├── monte_carlo.py        # 10K-run financial simulation
-│           ├── sentiment.py          # VADER competitor pain analysis
-│           ├── pipeline.py           # Orchestrator (parallel execution)
+│           ├── monte_carlo.py        # 10K-run Bear/Base/Bull financial simulation
+│           ├── sentiment.py          # VADER competitor pain analysis (14-company KB)
+│           ├── pipeline.py           # Orchestrator (parallel threads)
 │           ├── evaluate.py           # Model eval: AUC, F1, confusion matrix
 │           ├── METHODOLOGY.md        # DS methodology documentation
 │           ├── models/
@@ -53,11 +60,11 @@ LaunchMintAI/
 │           │   └── confusion_matrix.png    # Evaluation artifact
 │           ├── test_ds_stress.py     # 50-case stress test (5 tiers)
 │           └── eval/                 # Eval Proof Layer ★★
-│               ├── dataset.jsonl     # 50 labeled ideas · 11 domains
+│               ├── dataset.jsonl     # 50 labeled ideas · 11 domains · ground-truth sourced
 │               ├── golden.test.py    # Correctness → 50/50, 100%
 │               ├── benchmark.py      # Performance → 386ms avg, P95 596ms
-│               ├── generate_charts.py # 4 evaluation charts
-│               ├── EVAL_REPORT.md    # Full report with error analysis
+│               ├── generate_charts.py # 4 evaluation charts (PNG)
+│               ├── EVAL_REPORT.md    # Full report with error analysis + domain breakdown
 │               ├── results/
 │               │   ├── golden_results.json
 │               │   ├── benchmark_results.json
@@ -72,17 +79,29 @@ LaunchMintAI/
 │   ├── .env.example                  # Template — copy to .env
 │   ├── vercel.json                   # Vercel SPA routing config
 │   ├── index.html
-│   ├── index.tsx
-│   ├── App.tsx                       # Root: tab navigation + global state
+│   ├── index.tsx                     # React entry point
+│   ├── index.css                     # Global styles
+│   ├── App.tsx                       # Root: 4-tab navigation + global state
 │   ├── types.ts                      # All TypeScript interfaces
+│   ├── config.ts                     # API base URL + environment config
 │   ├── vite.config.ts
 │   ├── package.json
 │   ├── tsconfig.json
+│   │
+│   ├── services/                     # Frontend Service Layer
+│   │   ├── api.ts                    # Axios client + retry logic
+│   │   ├── cache.ts                  # Validator result cache (used by Forge)
+│   │   └── geminiService.ts          # Direct Gemini calls (client-side)
 │   │
 │   ├── components/                   # Shared UI Components
 │   │   ├── NeuralBackground.tsx      # Animated particle canvas
 │   │   ├── HUD.tsx                   # Left/Right tactical HUD overlays
 │   │   ├── DSInsights.tsx            # DS Intelligence Layer UI (3 cards)
+│   │   ├── ForensicReport.tsx        # War Room forensic report UI
+│   │   ├── AnalysisHeader.tsx        # Shared analysis header
+│   │   ├── ErrorBoundary.tsx         # React error boundary
+│   │   ├── HistoryDrawer.tsx         # Analysis history drawer
+│   │   ├── RiskBadge.tsx             # Risk tier badge component
 │   │   ├── AgentCard.tsx
 │   │   ├── AgentPipeline.tsx
 │   │   ├── AgentStatus.tsx
@@ -91,24 +110,34 @@ LaunchMintAI/
 │   │   └── tools/
 │   │       └── CompetitorDeepDive.tsx
 │   │
-│   └── features/                     # Feature Modules
+│   └── features/                     # 4 Core Tab Modules
 │       ├── validator/
-│       │   └── Validator.tsx         # Core startup validation + DS layer
+│       │   └── Validator.tsx         # Startup validation + DS layer + War Room intel
+│       │                             # Fires /analyze + /ds_insights + /war_room in parallel
 │       ├── vc-roast/
-│       │   └── VCRoast.tsx           # Ruthless VC skeptic analysis
+│       │   └── VCRoast.tsx           # VC skeptic — Tavily-grounded competitor intel injected
 │       ├── pitch-forge/
-│       │   └── PitchForge.tsx        # High-conversion pitch generator
-│       ├── war-room/
-│       │   └── WarRoom.tsx           # Corporate spy / competitor intel
+│       │   └── PitchForge.tsx        # Pitch generator — seeded with Validator cache data
 │       └── delta-analysis/
-│           └── DeltaAnalysis.tsx     # Strategic delta between ideas
+│           └── DeltaAnalysis.tsx     # Battle Room: Compare Arena — 2 ideas vs /compare API
 │
-├── .github/workflows/ds-eval.yml    # CI/CD pipeline
+├── INTERVIEW.md                      # Complete DS interview prep for this project
+├── PROJECT_STRUCTURE.md              # This file
+├── README.md                         # Project overview + DS eval results + setup guide
 ├── .gitignore
-├── LICENSE                          # MIT
-├── README.md                        # This file
-└── PROJECT_STRUCTURE.md             # This file
+└── LICENSE                           # MIT
 ```
+
+---
+
+## Tab Architecture
+
+| Tab | Backend Endpoints | Grounding |
+|-----|------------------|-----------|
+| **Validator** | `/analyze` + `/ds_insights` + `/war_room` (parallel) | Tavily waterfall search |
+| **VC Roast** | `/vc_roast` | Tavily competitor search injected into prompt |
+| **Pitch Forge** | `/pitch_forge` | Validator cache (TAM, growth, top competitor) |
+| **Battle Room** | `/compare` | Market data from both saved Validator results |
 
 ---
 
@@ -120,7 +149,7 @@ User Idea (string)
         ▼
 ┌─────────────────────────────────────────────┐
 │              pipeline.py                    │
-│         (parallel execution)                │
+│         (parallel threads)                  │
 ├──────────────┬──────────────┬───────────────┤
 │              │              │               │
 ▼              ▼              ▼               │
@@ -131,7 +160,6 @@ classifier.py  monte_carlo.py sentiment.py   │
 survival_prob  Bear/Base/Bull  pain_scores    │
 risk_tier      runway_months   kill_strategy  │
 confidence_band breakeven_prob top_complaints │
-│              │              │               │
 └──────────────┴──────────────┴───────────────┘
                       │
                       ▼
