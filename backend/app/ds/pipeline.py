@@ -46,8 +46,12 @@ def run(idea: str, market_data: dict = None, competitors: list = None) -> Dict:
 
     # ── Module 2: Monte Carlo ──────────────────────────────────────────
     try:
+        import hashlib
+        # Deterministic seed per idea
+        seed = int(hashlib.sha256(idea.encode()).hexdigest(), 16) % (2**32)
+        
         sector  = results.get("survival", {}).get("features_used", {}).get("sector_encoded", 9)
-        financials = simulate(sector=sector)
+        financials = simulate(sector=sector, seed=seed)
         results["financials"] = financials
     except Exception as e:
         results["financials"] = {"error": str(e)}

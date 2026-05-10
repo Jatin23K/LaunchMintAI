@@ -37,7 +37,7 @@ def _get_benchmarks(sector: int) -> dict:
     return SECTOR_BENCHMARKS.get(sector, SECTOR_BENCHMARKS[9])
 
 
-def simulate(sector: int = 9, seed_usd: float = SEED_FUNDING) -> Dict:
+def simulate(sector: int = 9, seed_usd: float = SEED_FUNDING, seed: int = None) -> Dict:
     """
     Runs N_SIMULATIONS Monte Carlo paths.
     Each path randomly samples CAC, LTV, churn, and growth
@@ -45,7 +45,10 @@ def simulate(sector: int = 9, seed_usd: float = SEED_FUNDING) -> Dict:
 
     Returns Bear (P10) / Base (P50) / Bull (P90) scenarios.
     """
-    np.random.seed(42)
+    if seed is not None:
+        np.random.seed(seed)
+    else:
+        np.random.seed(42)
     bench = _get_benchmarks(sector)
 
     # ── Sample distributions (±30% variation around benchmark) ──────────
