@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { 
-    ChevronRight, Sparkles, Loader2, ArrowLeft, Copy, CheckCircle2 
+import api from '../../services/api';
+import {
+    ChevronRight, Sparkles, Loader2, ArrowLeft, Copy, CheckCircle2
 } from 'lucide-react';
 import { PitchForgeData } from '../../types';
+import { API_BASE_URL } from '../../config';
+import { getCachedResult } from '../../services/cache';
 
 function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 'idle' | 'processing' | 'active') => void }) {
     const [input, setInput] = useState('');
@@ -24,8 +26,16 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
         setLoading(true); setData(null);
         setStatus('processing');
         try {
-            const apiBase = (import.meta as any).env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-            const response = await axios.post(`${apiBase}/pitch_forge`, { user_idea: text });
+            // Pull market data from Validator cache to ground the pitch
+            const cached = getCachedResult(text);
+            const mkt = (cached?.data?.market || {}) as any;
+            const topComp = (cached?.data?.competitors as any)?.[0]?.name || '';
+            const response = await api.post(`/pitch_forge`, {
+                user_idea: text,
+                market_size: mkt.forecast_tam || '',
+                growth_rate: mkt.growth || '',
+                top_competitor: topComp,
+            }, { retry: 2 } as any);
             setData(response.data);
             setStatus('active');
         } catch (err) {

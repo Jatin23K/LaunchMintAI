@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { AgentEvent, StartupReport } from "../types";
 import { TOOLS } from "../constants";
+import { API_BASE_URL } from "../config";
 
-const BACKEND_URL = "http://127.0.0.1:8000/run";
+const BACKEND_URL = API_BASE_URL + "/run";
 
 // --- VALIDATION MODE: ALL 4 AGENTS USE REAL AI ---
 const REAL_AGENTS = [
@@ -27,20 +28,43 @@ const AGENT_MAP: Record<string, string> = {
 };
 
 const callPythonBackend = async (extensionId: string, payload: any) => {
-    try {
-        console.log(`🔌 Bridging to Backend: ${extensionId}`, payload);
-        const response = await fetch(BACKEND_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ extension_id: extensionId, payload: payload })
-        });
-        const json = await response.json();
-        if (json.status === 'error') throw new Error(json.data?.error || "Backend Error");
-        return json.data;
-    } catch (error: any) {
-        console.error("💀 Backend Bridge Failed:", error);
-        throw error;
+    let lastError: any;
+    const maxRetries = 2;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            if (attempt > 0) {
+                console.log(`🔄 Retrying Backend Bridge (${attempt}/${maxRetries})...`);
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            console.log(`🔌 Bridging to Backend: ${extensionId}`, payload);
+            const response = await fetch(BACKEND_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ extension_id: extensionId, payload: payload })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+            }
+
+            const json = await response.json();
+            if (json.status === 'error') throw new Error(json.data?.error || "Backend Error");
+            return json.data;
+        } catch (error: any) {
+            lastError = error;
+            console.error(`⚠️ Attempt ${attempt + 1} failed:`, error.message);
+            // Only retry on network errors or 5xx server errors
+            if (error.name === 'TypeError' || (error.message.includes('HTTP Error') && !error.message.includes('4'))) {
+                continue;
+            }
+            break;
+        }
     }
+
+    console.error("💀 Backend Bridge Failed after retries:", lastError);
+    throw new Error(`Connection to intelligence engine failed: ${lastError.message}`);
 };
 
 export const streamFoundersCopilot = async (idea: string, mode: 'report' | 'tool', toolKey: any, onEvent: (e: AgentEvent) => void) => {

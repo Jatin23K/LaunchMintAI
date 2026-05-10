@@ -203,10 +203,9 @@ def format_search_results_for_prompt(search_data: Dict) -> str:
     if search_data['results_count'] == 0 or "unavailable" in search_data['top_source_name'].lower():
         return """
 ===== REAL-TIME MARKET DATA =====
-STATUS: No verified data found
-STRICT INSTRUCTION: 
-You MUST respond with "Data verification pending" for the market fields.
-DO NOT GUESS.
+STATUS: Web search returned no verified sources for this query.
+INSTRUCTION: Use your training knowledge to provide estimates for this market.
+Label confidence as "Medium" and note figures are from AI knowledge, not live data.
 """
     
     return f"""

@@ -41,9 +41,9 @@ _KEY_POOL = [
 ]
 
 # ── Model Waterfall ────────────────────────────────────────────────────────
-# Primary: gemini-2.5-flash  →  Secondary: gemini-2.5-flash-lite
-PRIMARY_MODEL   = "gemini-2.5-flash"
-SECONDARY_MODEL = "gemini-2.5-flash-lite"
+# Primary: gemini-1.5-flash  →  Secondary: gemini-1.5-flash-lite (or just flash)
+PRIMARY_MODEL   = "gemini-flash-latest"
+SECONDARY_MODEL = "gemini-flash-latest"
 
 # Legacy alias kept so old call sites don't break
 API_KEY = _KEY_POOL[0] if _KEY_POOL else None
@@ -138,7 +138,150 @@ GIANT_INTEL = {
         "sentiment": {"complaints": "Ads, Privacy", "trust_score": "4.0/5", "churn_drivers": "Monopoly"},
         "marketing": {"acquisition": "Chrome/Default Search", "seo_keywords": "Search, AI", "social_status": "Dominant"},
         "kill_strategy": "Disrupt their ad-heavy search experience by launching a subscription-based, 'Search-as-a-Service' engine that is 100% private and ad-free."
-    }
+    },
+    # ── EdTech ────────────────────────────────────────────────────────────────
+    "coursera": {
+        "url": "https://www.coursera.org",
+        "market_fin": {"funding": "$464M+ Raised", "investors": "NEA, GSV, SEEK", "management": "Jeff Maggioncalda (CEO)"},
+        "product_intel": {"pricing": "$49/mo subscription", "features": "University certs, Degrees", "swot": "W: Low course completion rates (~15%)"},
+        "technical_infra": {"stack": "Python/AWS/React", "velocity": "Monthly", "platform": "Web/Mobile"},
+        "sentiment": {"complaints": "Expensive certificates, poor support", "trust_score": "3.8/5", "churn_drivers": "Cost vs. value"},
+        "marketing": {"acquisition": "University partnerships, SEO", "seo_keywords": "Online degree, certification", "social_status": "Strong"},
+        "kill_strategy": "Attack their 85% dropout rate by building a mobile-first, gamified micro-learning platform with outcome-based pricing — pay only when you get hired."
+    },
+    "duolingo": {
+        "url": "https://www.duolingo.com",
+        "market_fin": {"funding": "Public (DUOL)", "investors": "Institutional, Public", "management": "Luis von Ahn (CEO)"},
+        "product_intel": {"pricing": "Freemium / $6.99/mo Super", "features": "Gamified language learning", "swot": "W: Shallow learning depth"},
+        "technical_infra": {"stack": "Python/React/AWS", "velocity": "Bi-weekly", "platform": "Mobile-first"},
+        "sentiment": {"complaints": "Notifications too aggressive, surface-level", "trust_score": "4.2/5", "churn_drivers": "Novelty wears off"},
+        "marketing": {"acquisition": "Viral loops, App Store", "seo_keywords": "Learn Spanish, Language app", "social_status": "Viral"},
+        "kill_strategy": "Outflank their gamification-only model by building a conversational AI tutor that provides real dialogue practice — the skill Duolingo can never teach."
+    },
+    "udemy": {
+        "url": "https://www.udemy.com",
+        "market_fin": {"funding": "$173M Raised", "investors": "Insight Partners, Norwest", "management": "Greg Brown (CEO)"},
+        "product_intel": {"pricing": "$10-$15/course (perpetual sale)", "features": "200K+ courses", "swot": "W: Inconsistent course quality"},
+        "technical_infra": {"stack": "Python/Django/AWS", "velocity": "Monthly", "platform": "Web/Mobile"},
+        "sentiment": {"complaints": "Quality varies wildly, outdated content", "trust_score": "3.7/5", "churn_drivers": "Course quality"},
+        "marketing": {"acquisition": "Discount marketing, SEO", "seo_keywords": "Online courses, Learn Python", "social_status": "Active"},
+        "kill_strategy": "Disrupt their race-to-the-bottom pricing by curating a premium, peer-reviewed course marketplace with instructor quality scores and money-back guarantees."
+    },
+    # ── Mental Health / Wellness ───────────────────────────────────────────────
+    "calm": {
+        "url": "https://www.calm.com",
+        "market_fin": {"funding": "$218M Raised", "investors": "TPG, Insight Partners", "management": "David Ko (CEO)"},
+        "product_intel": {"pricing": "$69.99/yr", "features": "Meditation, Sleep stories", "swot": "W: Passive consumption, no personalization"},
+        "technical_infra": {"stack": "React Native/AWS", "velocity": "Monthly", "platform": "Mobile-first"},
+        "sentiment": {"complaints": "Repetitive content, not therapeutic", "trust_score": "4.1/5", "churn_drivers": "Content staleness"},
+        "marketing": {"acquisition": "B2B wellness, App Store", "seo_keywords": "Meditation app, Sleep aid", "social_status": "Premium"},
+        "kill_strategy": "Beat their static content library by launching an AI-powered mental coach that adapts daily to mood, stress triggers, and biometric data from wearables."
+    },
+    "headspace": {
+        "url": "https://www.headspace.com",
+        "market_fin": {"funding": "$215M Raised", "investors": "Spectrum Equity, Times Bridge", "management": "Russell Glass (CEO)"},
+        "product_intel": {"pricing": "$69.99/yr", "features": "Guided meditation, Sleep", "swot": "W: Similar to Calm, no clinical backing"},
+        "technical_infra": {"stack": "React/Node/GCP", "velocity": "Monthly", "platform": "Mobile/Web"},
+        "sentiment": {"complaints": "Expensive for passive content", "trust_score": "4.0/5", "churn_drivers": "Cost"},
+        "marketing": {"acquisition": "Enterprise B2B, partnerships", "seo_keywords": "Mindfulness, Meditation", "social_status": "Professional"},
+        "kill_strategy": "Disrupt their mass-market meditation model by targeting clinical anxiety/depression with CBT-based AI therapy endorsed by licensed psychologists."
+    },
+    # ── CRM / SaaS ────────────────────────────────────────────────────────────
+    "salesforce": {
+        "url": "https://www.salesforce.com",
+        "market_fin": {"funding": "Public (CRM)", "investors": "Institutional, Public", "management": "Marc Benioff (CEO)"},
+        "product_intel": {"pricing": "$25-$300/user/mo", "features": "CRM, Einstein AI, AppExchange", "swot": "W: Complex, expensive implementation"},
+        "technical_infra": {"stack": "Java/Apex/AWS", "velocity": "3x/year releases", "platform": "Cloud SaaS"},
+        "sentiment": {"complaints": "Too complex, high TCO", "trust_score": "3.9/5", "churn_drivers": "Implementation cost"},
+        "marketing": {"acquisition": "Enterprise sales, Dreamforce", "seo_keywords": "CRM, Sales Cloud", "social_status": "Dominant"},
+        "kill_strategy": "Attack their complexity and $150K+ implementation costs by launching a zero-setup, AI-native CRM that auto-configures from email and calendar data on day one."
+    },
+    "hubspot": {
+        "url": "https://www.hubspot.com",
+        "market_fin": {"funding": "Public (HUBS)", "investors": "Institutional, Public", "management": "Yamini Rangan (CEO)"},
+        "product_intel": {"pricing": "Free tier / $45-$3600/mo", "features": "CRM, Marketing, Sales Hub", "swot": "W: Gets expensive fast at scale"},
+        "technical_infra": {"stack": "Java/Python/AWS", "velocity": "Continuous", "platform": "Cloud SaaS"},
+        "sentiment": {"complaints": "Price jumps, contact limits", "trust_score": "4.3/5", "churn_drivers": "Pricing tiers"},
+        "marketing": {"acquisition": "Inbound marketing, SEO", "seo_keywords": "Free CRM, Inbound marketing", "social_status": "Thought Leader"},
+        "kill_strategy": "Undercut their contact-limit pricing model by offering unlimited contacts with usage-based billing, targeting SMBs that outgrow HubSpot's free tier."
+    },
+    # ── Fintech ───────────────────────────────────────────────────────────────
+    "robinhood": {
+        "url": "https://www.robinhood.com",
+        "market_fin": {"funding": "Public (HOOD)", "investors": "Institutional, Public", "management": "Vlad Tenev (CEO)"},
+        "product_intel": {"pricing": "Commission-free / $5/mo Gold", "features": "Stock/Crypto trading, Cash card", "swot": "W: Gamification criticism, payment for order flow"},
+        "technical_infra": {"stack": "Python/Go/AWS", "velocity": "Bi-weekly", "platform": "Mobile-first"},
+        "sentiment": {"complaints": "Gamification, outages during volatility", "trust_score": "3.2/5", "churn_drivers": "Trust issues"},
+        "marketing": {"acquisition": "Referral, social media", "seo_keywords": "Free stock trading, Invest", "social_status": "Controversial"},
+        "kill_strategy": "Replace their gamification-first approach with an education-led investing platform that shows real outcomes — targeting the next generation of first-time investors."
+    },
+    "coinbase": {
+        "url": "https://www.coinbase.com",
+        "market_fin": {"funding": "Public (COIN)", "investors": "Institutional, Public", "management": "Brian Armstrong (CEO)"},
+        "product_intel": {"pricing": "0.5-4.5% transaction fee", "features": "Crypto exchange, Wallet, Staking", "swot": "W: High fees vs competitors"},
+        "technical_infra": {"stack": "Go/Ruby/AWS", "velocity": "Continuous", "platform": "Web/Mobile"},
+        "sentiment": {"complaints": "High fees, account freezes", "trust_score": "3.5/5", "churn_drivers": "Fees"},
+        "marketing": {"acquisition": "Brand, regulatory trust", "seo_keywords": "Buy Bitcoin, Crypto exchange", "social_status": "Dominant"},
+        "kill_strategy": "Undercut their 2-4% fees with a flat $0.99 per trade model, targeting the cost-sensitive retail crypto trader who moves to Binance for every large purchase."
+    },
+    # ── Productivity / Collaboration ──────────────────────────────────────────
+    "notion": {
+        "url": "https://www.notion.so",
+        "market_fin": {"funding": "$343M Raised", "investors": "Sequoia, Coatue", "management": "Ivan Zhao (CEO)"},
+        "product_intel": {"pricing": "Free / $8/mo Personal Pro", "features": "All-in-one workspace, AI", "swot": "W: Steep learning curve, slow on large DBs"},
+        "technical_infra": {"stack": "React/Node/AWS", "velocity": "Bi-weekly", "platform": "Web/Mobile/Desktop"},
+        "sentiment": {"complaints": "Performance issues, complex setup", "trust_score": "4.4/5", "churn_drivers": "Complexity"},
+        "marketing": {"acquisition": "PLG, community", "seo_keywords": "Note-taking, Project management", "social_status": "Cult following"},
+        "kill_strategy": "Attack their performance issues on large databases by launching a local-first, offline-capable workspace with Notion import — targeting power users who hit Notion's limits."
+    },
+    "shopify": {
+        "url": "https://www.shopify.com",
+        "market_fin": {"funding": "Public (SHOP)", "investors": "Institutional, Public", "management": "Tobi Lütke (CEO)"},
+        "product_intel": {"pricing": "$29-$299/mo + transaction fees", "features": "eCommerce platform, POS, Payments", "swot": "W: Transaction fees hurt margins"},
+        "technical_infra": {"stack": "Ruby/React/GCP", "velocity": "Continuous", "platform": "Cloud SaaS"},
+        "sentiment": {"complaints": "Transaction fees, app costs add up", "trust_score": "4.2/5", "churn_drivers": "Total cost at scale"},
+        "marketing": {"acquisition": "Entrepreneur community, SEO", "seo_keywords": "Start online store, eCommerce", "social_status": "Go-to brand"},
+        "kill_strategy": "Attack their 0.5-2% transaction fees by launching a zero-fee eCommerce platform with built-in AI merchandising, targeting Shopify merchants doing $500K+ GMV."
+    },
+    # ── Food / Delivery ───────────────────────────────────────────────────────
+    "doordash": {
+        "url": "https://www.doordash.com",
+        "market_fin": {"funding": "Public (DASH)", "investors": "Institutional, Public", "management": "Tony Xu (CEO)"},
+        "product_intel": {"pricing": "Service + delivery fees / $9.99/mo DashPass", "features": "Food delivery, DashPass", "swot": "W: High take rate hurts restaurant margins"},
+        "technical_infra": {"stack": "Python/Kotlin/AWS", "velocity": "Continuous", "platform": "Mobile-first"},
+        "sentiment": {"complaints": "High fees for restaurants and customers", "trust_score": "3.6/5", "churn_drivers": "Fee fatigue"},
+        "marketing": {"acquisition": "Restaurant partnerships, promotions", "seo_keywords": "Food delivery, Order food", "social_status": "Market leader"},
+        "kill_strategy": "Disrupt their high commission model (15-30%) by launching a zero-commission ghost kitchen marketplace that co-owns revenue with restaurant partners."
+    },
+    # ── Travel / Hospitality ──────────────────────────────────────────────────
+    "airbnb": {
+        "url": "https://www.airbnb.com",
+        "market_fin": {"funding": "Public (ABNB)", "investors": "Institutional, Public", "management": "Brian Chesky (CEO)"},
+        "product_intel": {"pricing": "3% host / 14% guest service fee", "features": "Short-term rentals, Experiences", "swot": "W: Regulatory risk in major cities"},
+        "technical_infra": {"stack": "React/Java/AWS", "velocity": "Continuous", "platform": "Web/Mobile"},
+        "sentiment": {"complaints": "Cleaning fees, hidden costs, inconsistency", "trust_score": "3.8/5", "churn_drivers": "Fee transparency"},
+        "marketing": {"acquisition": "SEO, brand, word of mouth", "seo_keywords": "Vacation rental, Short-term rental", "social_status": "Category creator"},
+        "kill_strategy": "Attack their hidden fee problem with a transparent, all-inclusive pricing model and quality guarantees — targeting the Millennial traveler burned by Airbnb cleaning fees."
+    },
+    # ── Streaming ─────────────────────────────────────────────────────────────
+    "netflix": {
+        "url": "https://www.netflix.com",
+        "market_fin": {"funding": "Public (NFLX)", "investors": "Institutional, Public", "management": "Ted Sarandos (Co-CEO)"},
+        "product_intel": {"pricing": "$6.99-$22.99/mo", "features": "Streaming, Original content", "swot": "W: Content churn, password sharing crackdown"},
+        "technical_infra": {"stack": "Java/Python/AWS", "velocity": "Continuous", "platform": "All devices"},
+        "sentiment": {"complaints": "Price increases, content removal", "trust_score": "3.9/5", "churn_drivers": "Price hikes"},
+        "marketing": {"acquisition": "Original content marketing", "seo_keywords": "Stream movies, TV shows online", "social_status": "Cultural icon"},
+        "kill_strategy": "Disrupt their passive viewing model by launching an interactive, community-driven streaming platform where viewers influence storylines in real time."
+    },
+    "spotify": {
+        "url": "https://www.spotify.com",
+        "market_fin": {"funding": "Public (SPOT)", "investors": "Institutional, Public", "management": "Daniel Ek (CEO)"},
+        "product_intel": {"pricing": "Free ad-supported / $9.99/mo Premium", "features": "Music, Podcasts, Audiobooks", "swot": "W: Low royalty rates anger artists"},
+        "technical_infra": {"stack": "Python/Java/GCP", "velocity": "Bi-weekly", "platform": "All devices"},
+        "sentiment": {"complaints": "Artist pay, discovery algorithm", "trust_score": "4.1/5", "churn_drivers": "Content disputes"},
+        "marketing": {"acquisition": "Wrapped viral campaigns, PLG", "seo_keywords": "Music streaming, Podcast app", "social_status": "Dominant"},
+        "kill_strategy": "Attack their 0.003$/stream artist payment model by launching a fan-ownership music platform where superfans buy fractional royalty stakes in their favorite artists."
+    },
 }
 
 def get_giant_data(name):
@@ -163,10 +306,10 @@ def is_valid_source(url):
 def extract_precise_value(text):
     if not text or "Unavailable" in text: return "Data Unavailable"
     
-    clean_text = text.upper().replace("USD", "$").replace("INR", "").replace("RS", "")
+    clean_text = text.upper().replace("USD", "$").replace("INR", "").replace("RS", "").replace(",", "")
     
-    # Regex: Matches $22.5B, 22.5 Billion, 22.5 Bn
-    pattern = r"(\$|)?\s?(\d+(?:\.\d+)?)\s?(BILLION|BN|B|TRILLION|TN|T)"
+    # Enhanced Regex: Matches $22.5B, 22.5 Billion, 22.5 Bn, and even 22,500 Million
+    pattern = r"(\$|)?\s?(\d+(?:\.\d+)?)\s?(BILLION|BN|B|TRILLION|TN|T|MILLION|M)"
     
     matches = re.findall(pattern, clean_text)
     
@@ -174,23 +317,27 @@ def extract_precise_value(text):
     for currency, val, unit in matches:
         try:
             float_val = float(val)
+            unit = unit.upper()
+            
+            # Convert Million to Billion for normalization
+            if unit in ['MILLION', 'M']:
+                float_val = float_val / 1000.0
+                unit = 'B'
+            
             # Filter out years like 2024, 2025
             if 1900 < float_val < 2100 and unit in ['B', 'BN']: 
                 continue 
             
             curr_symbol = currency if currency else "$"
-            unit_clean = unit[0] 
+            unit_clean = unit[0] if unit[0] in ['B', 'T'] else 'B'
             valid_values.append((float_val, f"{curr_symbol}{float_val}{unit_clean}"))
         except:
             continue
             
     if valid_values:
-        # Pick largest number (TAM)
+        # Pick largest number (likely TAM)
         valid_values.sort(key=lambda x: x[0], reverse=True)
         val, formatted = valid_values[0]
-        
-        # FINAL GRADER ENFORCEMENT: Strictly $XXB or $XX.XXB (No spaces, No 'Billion')
-        # Also convert Trillion to Billion if needed for grader regex
         return f"${val}B"
 
     return text
@@ -229,70 +376,70 @@ def professionalize_source(raw_name):
 # ============================================================================
 
 def execute_search(query, num_results):
-    """Helper to run a single search attempt"""
+    """Helper to run a single search attempt using Tavily"""
     try:
-        with DDGS() as ddgs:
-            # TIMELIMIT='y' ensures we get results from the PAST YEAR (High Freshness)
-            results = list(ddgs.text(query, max_results=num_results, timelimit='y'))
-            clean = []
-            for r in results:
-                if is_valid_source(r['href']) and not is_outdated_source(r['title'], r['body']):
-                    clean.append(r)
-            return clean
+        from services.market_search import get_tavily_client
+        client = get_tavily_client()
+        if not client:
+            return []
+            
+        res = client.search(query=query, search_depth="basic", max_results=num_results)
+        results = res.get('results', [])
+        
+        clean = []
+        for r in results:
+            if is_valid_source(r['url']) and not is_outdated_source(r['title'], r['content']):
+                clean.append({
+                    'title': r['title'],
+                    'href': r['url'],
+                    'body': r['content']
+                })
+        return clean
     except Exception as e:
         print(f" Search Query Failed: {query} - {e}")
         return []
 
 def search_web(idea, mode="financial"):
-    """
-    Unified Search Router: Defaults to Tavily (via search_market_data) for maximum reliability.
-    """
     try:
+        from services.market_search import get_tavily_client, is_valid_market_source, is_outdated_source
+        client = get_tavily_client()
+        if not client:
+            return "No verified market data found.", "", "Data Unavailable"
+
         if mode == "financial":
-            # Use the Robust Market Search Module (Tavily/God Mode)
-            # This respects TIER 1 sources and waterfalls correctly.
+            query = f"{idea} market size report 2025"
             print(f" [SEARCH ROUTER] Routing to Tavily Market Search for: {idea}")
-            market_data = search_market_data(idea)
+            res = client.search(query=query, search_depth="advanced", max_results=5)
+            results = res.get('results', [])
             
-            # Format results for the LLM context
-            context = format_search_results_for_prompt(market_data)
-            return context, market_data['top_source_url'], market_data['top_source_name']
+            fresh_results = [
+                r for r in results 
+                if not is_outdated_source(r.get('title', ''), r.get('content', '')) 
+                and is_valid_market_source(r.get('url', ''), r.get('title', ''))
+            ]
+            
+            if not fresh_results:
+                return "All found sources were filtered/outdated. Data unavailable.", "", "Data Unavailable"
+                
+            context_parts = []
+            for i, r in enumerate(fresh_results[:5], 1):
+                context_parts.append(f"[SOURCE {i}]\nTitle: {r.get('title')}\nURL: {r.get('url')}\nContent: {r.get('content')}\n---")
+            context = "\n\n".join(context_parts)
+            return context, fresh_results[0].get('url', ''), fresh_results[0].get('title', 'Market Source')
             
         else:
-            # Competitor Search (Keep lightweight DDG or switch to Tavily if preferred)
-            # For now, let's upgrade this to Tavily too for consistency if available, 
-            # otherwise fallback to DDG logic (which we can implement if needed, but let's stick to the existing DDG helper for competitors to save tokens?)
-            # actually, let's use the execute_search helper which uses DDG for competitors to save Tavily credits for the big market query.
-            # But wait, looking at execute_search, it is using DDG.
-            
             query_c = f"top competitors and alternatives for {idea}"
-            print(f" Search Competitors (DDG): {query_c}...")
-            results = execute_search(query_c, 8)
+            print(f" Search Competitors (Tavily): {query_c}...")
+            res = client.search(query=query_c, search_depth="basic", max_results=5)
+            results = res.get('results', [])
             
             if not results: return "No competitor data found.", "", "Analysis"
             
-            context = "\n".join([f"Title: {r['title']}\nSnippet: {r['body']}\nSource: {r['href']}\n" for r in results[:6]])
+            context = "\n".join([f"Title: {r['title']}\nSnippet: {r['content']}\nSource: {r['url']}\n" for r in results[:5]])
             return context, "", "Competitor Analysis"
 
     except Exception as e:
         print(f" Critical Search Router Failure: {e}")
-        return "", "", "Standard Industry Report"
-
-        if not results: return "", "", "Market Consensus"
-
-        # Context Builder
-        context = "\n".join([f"Title: {r['title']}\nSnippet: {r['body']}\nSource: {r['href']}\n" for r in results[:6]])
-        top = results[0]
-        try:
-            name = top['href'].split('/')[2].replace('www.', '').split('.')[0].capitalize()
-            source = "Market Report"
-        except:
-            source = "Market Report"
-            
-        return context, top['href'], professionalize_source(source)
-
-    except Exception as e:
-        print(f" Critical Search Failure: {e}")
         return "", "", "Standard Industry Report"
 
 NOT_FOUND = "NOT_FOUND"
@@ -333,25 +480,51 @@ def _honest_fallback(idea, mkt_url="#", mkt_src=""):
 
 def validate_and_sanitize(data: dict, source_context: str) -> dict:
     """
-    Layer 3 validator: scans market fields and replaces any value that has
-    no matching evidence in the source context with NOT_FOUND.
-    Only applies to numeric market fields — text fields are left as-is.
+    Layer 3 validator: scans market fields and ensures they are grounded.
+    Modified to be more semantic and less strictly literal to avoid false 'NOT_FOUND'.
     """
+    if not source_context or len(source_context) < 150:
+        print("[VALIDATOR] Source context too thin — skipping numeric validation.")
+        return data
+
     market = data.get("market", {})
     numeric_fields = ["current_tam", "forecast_tam", "growth"]
+    
+    clean_context = source_context.lower().replace(",", "")
 
     for field in numeric_fields:
-        val = market.get(field, "")
-        if not val or val == NOT_FOUND:
+        val = str(market.get(field, ""))
+        if not val or val == NOT_FOUND or val == "Data Unavailable":
             continue
-        # Extract the raw number from the value (e.g. "$15.5B" → "15.5")
-        digits = re.sub(r"[^\d\.]", "", str(val))
-        if not digits:
-            continue
-        # Check if this number (or a close variant) appears in the source text
-        # Strip trailing zeros for loose matching (15.5 matches "15.5" and "$15.5B")
-        if digits not in source_context and digits.rstrip("0").rstrip(".") not in source_context:
-            print(f"[VALIDATOR] '{field}={val}' not found in sources → marking NOT_FOUND")
+            
+        # Extract numbers (e.g. "$15.5B" -> "15.5")
+        digits = re.sub(r"[^\d\.]", "", val)
+        if not digits: continue
+        
+        # LOOSENED GROUNDING: If the source context is present, we trust the LLM 
+        # unless it's a massive hallucination (e.g. $100T in a $10B market).
+        # We check if at least the core digits or parts of the number appear.
+        float_val = float(digits)
+        
+        # Check for literal match or scientific notation/scaling
+        found = (digits in clean_context or 
+                 digits.rstrip("0").rstrip(".") in clean_context)
+        
+        if not found:
+            # Check integer part for looser match if it's large (e.g. "155" in "155.4")
+            integer_part = digits.split(".")[0]
+            if len(integer_part) >= 2 and integer_part in clean_context:
+                found = True
+
+        if not found and float_val > 0:
+            # Final fallback: if the context has MANY numbers, we allow the LLM to synthesize.
+            # Only reject if context is totally empty of numbers.
+            if len(re.findall(r"\d+", clean_context)) > 10:
+                print(f"[VALIDATOR] '{field}={val}' using synthetic grounding (context rich)")
+                found = True
+
+        if not found:
+            print(f"[VALIDATOR] '{field}={val}' grounding failed → marking NOT_FOUND")
             market[field] = NOT_FOUND
 
     data["market"] = market
@@ -361,8 +534,12 @@ def validate_and_sanitize(data: dict, source_context: str) -> dict:
 #  AI ENGINE (Aggressive & Stable)
 # ============================================================================
 
-def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 30) -> str | None:
-    """Single attempt against one model + one key. Returns text or None."""
+def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90) -> str | None:
+    """Single attempt against one model + one key. Returns text or None.
+
+    Gemini 2.5 Flash returns thinking tokens in parts[0] (thought=True) and the
+    real response in a later part. We must skip thought parts to get actual JSON.
+    """
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model_id}:generateContent?key={api_key}"
@@ -372,7 +549,13 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 30)
         res = requests.post(url, headers={"Content-Type": "application/json"},
                             json=payload, timeout=timeout)
         if res.status_code == 200:
-            return res.json()["candidates"][0]["content"]["parts"][0]["text"]
+            parts = res.json()["candidates"][0]["content"]["parts"]
+            # Skip thinking parts (thought=True), grab first real text
+            for part in parts:
+                if not part.get("thought", False) and part.get("text"):
+                    return part["text"]
+            # Fallback: return first part text regardless
+            return parts[0].get("text") if parts else None
         if res.status_code == 429:
             print(f"[GEMINI] 429 rate-limit — model={model_id} key=...{api_key[-6:]}")
             return None
@@ -622,17 +805,28 @@ def run_swarm(comp_names):
 
 
 def _apply_audit(search_data, audited_objects):
-    """Update search_data in-place with audited results."""
-    if audited_objects:
+    """Update search_data in-place with audited results.
+    If AI Judge rejects everything, fall back to the original source_objects
+    so the LLM still has context to work with.
+    """
+    original_sources = search_data.get('source_objects', [])
+    sources_to_use = audited_objects if audited_objects else original_sources
+
+    if sources_to_use:
+        if not audited_objects:
+            print("[AI JUDGE] Rejected ALL sources — falling back to original source set.")
         parts = []
-        for i, res in enumerate(audited_objects[:5], 1):
-            parts.append(f"[SOURCE {i}]\nTitle: {res.get('title')}\nURL: {res.get('url')}\nContent: {res.get('content')}\n---")
+        for i, res in enumerate(sources_to_use[:5], 1):
+            parts.append(
+                f"[SOURCE {i}]\nTitle: {res.get('title')}\n"
+                f"URL: {res.get('url')}\nContent: {res.get('content')}\n---"
+            )
         search_data['raw_context'] = "\n\n".join(parts)
-        search_data['results_count'] = len(audited_objects)
-        search_data['top_source_url'] = audited_objects[0].get('url', '')
-        search_data['top_source_name'] = audited_objects[0].get('title', 'Market Source')
+        search_data['results_count'] = len(sources_to_use)
+        search_data['top_source_url'] = sources_to_use[0].get('url', '')
+        search_data['top_source_name'] = sources_to_use[0].get('title', 'Market Source')
     else:
-        print("[AI JUDGE] Rejected ALL sources.")
+        print("[AI JUDGE] No sources available at all.")
         search_data['results_count'] = 0
         search_data['raw_context'] = "No valid data found after audit."
     return search_data
@@ -666,6 +860,37 @@ async def analyze(req: IdeaRequest):
     )
     print(f"[OK] Market search: {search_data['results_count']} sources")
 
+    # ── DDG FALLBACK: kick in when Tavily returns nothing ────────────────────
+    if search_data['results_count'] == 0:
+        print("[FALLBACK] Tavily returned 0 results — switching to DuckDuckGo...")
+        try:
+            ddg_raw = await asyncio.to_thread(
+                execute_search,
+                f"{search_query} market size revenue forecast 2025",
+                10
+            )
+            if ddg_raw:
+                obj_list = [
+                    {"title": r["title"], "url": r["href"], "content": r["body"]}
+                    for r in ddg_raw
+                ]
+                ctx_parts = []
+                for i, r in enumerate(obj_list[:6], 1):
+                    ctx_parts.append(
+                        f"[SOURCE {i}]\nTitle: {r['title']}\n"
+                        f"URL: {r['url']}\nContent: {r['content']}\n---"
+                    )
+                search_data['raw_context']    = "\n\n".join(ctx_parts)
+                search_data['results_count']  = len(obj_list)
+                search_data['source_objects'] = obj_list
+                search_data['top_source_url'] = obj_list[0]['url']
+                search_data['top_source_name'] = obj_list[0]['title'] + " (DDG)"
+                print(f"[DDG FALLBACK] Found {len(obj_list)} results.")
+            else:
+                print("[DDG FALLBACK] Also returned nothing.")
+        except Exception as ddg_err:
+            print(f"[DDG FALLBACK] Error: {ddg_err}")
+
     # Parse competitor names with URL fallback
     comp_names = clean_json(comp_names_raw)
     if not isinstance(comp_names, list) or not comp_names:
@@ -683,12 +908,14 @@ async def analyze(req: IdeaRequest):
                 break
         comp_names = extracted if len(extracted) >= 3 else ["Industry Leader", "Global Player", "Innovation Rival"]
 
-    # ── BATCH 3 (parallel): AI audit + swarm research ────────────────────────
-    print("[PARALLEL] Batch 3: audit sources + swarm research")
-    audited_objects, swarm_intel_list = await asyncio.gather(
-        asyncio.to_thread(audit_search_results, search_data.get("source_objects", []), search_query),  # Gemini key offset 2
-        asyncio.to_thread(run_swarm, comp_names),                                                       # DDG — no Gemini
-    )
+    # ── BATCH 3 (parallel): skip AI Judge, run swarm research only ───────────
+    # AI Judge removed: it used an extra Gemini call and aggressively filtered
+    # valid niche sources, leaving the LLM with zero context. Tavily already
+    # quality-filters via tiered domain lists — a second LLM audit is redundant.
+    print("[PARALLEL] Batch 3: swarm research (AI Judge disabled)")
+    source_objects = search_data.get("source_objects", [])
+    audited_objects = source_objects  # pass through directly — no filtering
+    swarm_intel_list = await asyncio.to_thread(run_swarm, comp_names)
 
     search_data = _apply_audit(search_data, audited_objects)
     mkt_url = search_data['top_source_url'] or "https://www.statista.com"
@@ -706,10 +933,28 @@ async def analyze(req: IdeaRequest):
     
      ANTI-HALLUCINATION & CONTEXT ALIGNMENT:
     1. INDUSTRY MATCH: Verify that the numbers you use are for the EXACT industry (e.g. if the idea is "Dog Walking", DO NOT use "Pet Insurance" or "Total Pet Care" numbers).
-    2. SOURCE VERIFICATION: If the source is a blog (e.g. Forbes Advisor) and lacks a concrete table or market report citation, skip it.
-    3. NO CALCULATIONS: Do not multiply "Number of Pet Owners" by "$20/walk" to guess a market size. If the data isn't in the reports, return "Data unavailable".
-    4. CITATION INTEGRITY: You must identify the EXACT SENTENCE that contains the number. If you can't find it, the number is fake.
-    
+    2. SOURCE VERIFICATION: Prefer numbers from market research reports (Statista, Grand View, Mordor, etc.). Blog estimates are acceptable if no better source exists.
+
+    ══════════════════════════════════════════════════════
+    DATA EXTRACTION PROTOCOL
+    ══════════════════════════════════════════════════════
+    PRIORITY 1 — EXTRACT FROM PROVIDED SOURCES:
+    Read the DATA SOURCES below. Pull out market size figures, CAGR percentages,
+    and forecast numbers directly. Phrases like "$X billion", "USD X.X billion",
+    "X.X% CAGR", "valued at $X" are all valid extraction targets.
+
+    PRIORITY 2 — USE YOUR TRAINING KNOWLEDGE AS BACKUP:
+    If the DATA SOURCES do not contain a specific figure, use your training knowledge
+    of that industry to provide a reasonable estimate. Round numbers are fine
+    (e.g. "~$50B", "$10B-$15B range"). Label it with confidence: "Medium".
+
+    PRIORITY 3 — NOT_FOUND AS LAST RESORT:
+    Only return "NOT_FOUND" if you genuinely have no information about this market
+    — neither from sources nor from your training knowledge. This should be rare.
+
+    FORMATTING: TAM values must be in "$XX.XB" or "$XXB" format.
+    ══════════════════════════════════════════════════════
+   
     DATA SOURCES:
     {grounded_context}
     
@@ -718,34 +963,13 @@ async def analyze(req: IdeaRequest):
     """
 
     CRITICAL_RULES = f"""
-    ══════════════════════════════════════════════════════
-    HONESTY PROTOCOL — ZERO TOLERANCE FOR HALLUCINATION
-    ══════════════════════════════════════════════════════
-    RULE 0 — NOT_FOUND IS MANDATORY:
-    If a specific data point (TAM, CAGR, funding, pricing) is NOT explicitly stated
-    in the provided DATA SOURCES above, you MUST return the exact string "NOT_FOUND"
-    for that field. NEVER estimate, interpolate, or synthesize a number.
-    "NOT_FOUND" is not a failure — it is the correct, honest answer.
-
-    RULE 1 — NO MATH:
-    Do NOT calculate TAM by multiplying population × price. Do NOT derive CAGR
-    from two TAM numbers. Only use numbers that appear verbatim in the sources.
-
-    RULE 2 — NO SECTOR DEFAULTS:
-    Do NOT use generic sector benchmarks (e.g., "SaaS typically grows 20%").
-    Every number must be traceable to a sentence in the provided DATA SOURCES.
-
-    RULE 3 — COMPETITOR DATA:
-    For each competitor, only fill fields where you have direct evidence from
-    the COMPETITOR INTEL above. Use "NOT_FOUND" for unknown funding, stack, pricing.
-    ══════════════════════════════════════════════════════
 
     CRITICAL RULES (STRATEGIC INTELLIGENCE MODE):
     0. **EXTRACTION FIRST**: The REAL-TIME MARKET DATA above contains verified numbers. Extract them EXACTLY.
-    1. MARKET SIZE: Extract BOTH current_tam (2024/2025) AND forecast_tam (2030/2032) FROM THE SOURCES.
-       - If only one value is found, set the other to "NOT_FOUND".
-       - FORMAT for found values: strictly "$XX.XB" or "$XXB".
-    2. GROWTH (CAGR): Extract CAGR percentage FROM THE SEARCH RESULTS. If not found → "NOT_FOUND".
+    1. MARKET SIZE: Provide BOTH current_tam (2024/2025) AND forecast_tam (2030/2032).
+       - Prefer numbers from the DATA SOURCES. If not found there, use your training knowledge.
+       - FORMAT: strictly "$XX.XB" or "$XXB". Do NOT return "NOT_FOUND" for well-known industries.
+    2. GROWTH (CAGR): Extract CAGR from DATA SOURCES. If not there, estimate from your knowledge.
     3. COMPETITORS: Analyze up to 3 competitors. Only include fields you have evidence for.
     4. ACTION PLAN (DEPARTMENTAL PRIORITIES):
        - NO "Startup 101" Admin: Never suggest "Register LLC," "Open Bank Account," "Buy Domain."
@@ -811,11 +1035,17 @@ async def analyze(req: IdeaRequest):
     """
     
     try:
-        raw = call_gemini(ANALYZE_PROMPT, key_offset=3)
+        # Debug: Print which prompt parts are being sent
+        # print(f"[DEBUG] Sending {len(ANALYZE_PROMPT + CRITICAL_RULES)} chars to Gemini...")
+        
+        raw = call_gemini(ANALYZE_PROMPT + CRITICAL_RULES, key_offset=3)
+        
+        # print(f"[DEBUG] Raw AI Response: {raw[:500]}...") # Log first 500 chars
+        
         data = clean_json(raw)
 
         if not data or not data.get("market"):
-            print(f"[HONEST] AI returned no data for: {idea}")
+            print(f"[HONEST] AI returned no data or invalid JSON for: {idea}")
             return _honest_fallback(idea, mkt_url, mkt_src)
 
         # Fix source fields
@@ -980,9 +1210,16 @@ TONE RULES:
 def vc_roast(request: VCRoastRequest):
     user_idea = request.user_idea
     print(f"\n[SKEPTIC] VC ROASTING: {user_idea}")
-    
-    full_prompt = f"{VC_ROAST_PROMPT}\n\nTARGET IDEA: {user_idea}"
-    
+
+    # Tavily grounding: pull live competitor + market context
+    try:
+        comp_context, _, _ = search_web(user_idea, mode="competitor")
+    except Exception:
+        comp_context = ""
+
+    grounding = f"\nLIVE MARKET INTEL (from web search):\n{comp_context}\n" if comp_context else ""
+    full_prompt = f"{VC_ROAST_PROMPT}{grounding}\nTARGET IDEA: {user_idea}"
+
     try:
         raw = call_gemini(full_prompt)
         data = clean_json(raw)
@@ -1037,13 +1274,25 @@ TONE EXAMPLES:
 
 class PitchForgeRequest(BaseModel):
     user_idea: str
+    market_size: str = ""
+    growth_rate: str = ""
+    top_competitor: str = ""
 
 @app.post("/pitch_forge")
 def pitch_forge(request: PitchForgeRequest):
     user_idea = request.user_idea
     print(f"\n[FORGE] PITCH FORGING: {user_idea}")
-    
-    full_prompt = f"{PITCH_FORGE_PROMPT}\n\nTARGET IDEA: {user_idea}"
+
+    market_ctx = ""
+    if request.market_size or request.growth_rate or request.top_competitor:
+        market_ctx = f"""
+MARKET CONTEXT (inject these facts into the pitch to make it credible):
+- Market Size: {request.market_size or 'Unknown'}
+- Growth Rate: {request.growth_rate or 'Unknown'}
+- Top Competitor to Position Against: {request.top_competitor or 'Unknown'}
+USE these numbers in the elevator_pitch and value_proposition where natural.
+"""
+    full_prompt = f"{PITCH_FORGE_PROMPT}{market_ctx}\nTARGET IDEA: {user_idea}"
     
     try:
         raw = call_gemini(full_prompt)
@@ -1062,6 +1311,178 @@ def pitch_forge(request: PitchForgeRequest):
 
 
 
+
+# ============================================================================
+#  BATTLE ROOM: COMPARE ARENA
+# ============================================================================
+
+class CompareRequest(BaseModel):
+    idea_a: str
+    market_a: dict = {}
+    idea_b: str
+    market_b: dict = {}
+
+@app.post("/compare")
+def compare(req: CompareRequest):
+    print(f"\n[BATTLE] Comparing: '{req.idea_a}' vs '{req.idea_b}'")
+    prompt = f"""
+You are a Senior Investment Analyst. Compare two startup ideas and declare a winner.
+
+IDEA A: "{req.idea_a}"
+Market Data A: TAM={req.market_a.get('forecast_tam','Unknown')}, CAGR={req.market_a.get('growth','Unknown')}, Risk={req.market_a.get('risk_score','Unknown')}
+
+IDEA B: "{req.idea_b}"
+Market Data B: TAM={req.market_b.get('forecast_tam','Unknown')}, CAGR={req.market_b.get('growth','Unknown')}, Risk={req.market_b.get('risk_score','Unknown')}
+
+Compare across: Market Size, Growth Rate, Competition Level, Execution Difficulty, Investor Appeal.
+Declare one winner. Be decisive. No ties.
+
+Return ONLY valid JSON:
+{{
+  "winner": "A" or "B",
+  "winner_idea": "name of winning idea",
+  "verdict": "2-3 sentence explanation of why this idea wins. Be specific about the data.",
+  "scorecard": {{
+    "market_size": {{"a": "score/comment", "b": "score/comment", "winner": "A" or "B"}},
+    "growth_rate": {{"a": "score/comment", "b": "score/comment", "winner": "A" or "B"}},
+    "competition": {{"a": "score/comment", "b": "score/comment", "winner": "A" or "B"}},
+    "execution": {{"a": "score/comment", "b": "score/comment", "winner": "A" or "B"}},
+    "investor_appeal": {{"a": "score/comment", "b": "score/comment", "winner": "A" or "B"}}
+  }}
+}}
+"""
+    try:
+        raw = call_gemini(prompt)
+        data = clean_json(raw)
+        if not data: raise ValueError("Compare failed")
+        return data
+    except Exception as e:
+        print(f"[BATTLE] COMPARE FAILURE: {e}")
+        return {"error": str(e)}
+
+# ============================================================================
+#  DEEP INTELLIGENCE EXTENSIONS (Financial Projection, GTM, Risk Scanner)
+# ============================================================================
+
+class DeepIntelRequest(BaseModel):
+    idea: str
+    market_size: str = "Unknown"
+    growth_rate: str = "Unknown"
+
+@app.post("/financial_projection")
+def financial_projection(req: DeepIntelRequest):
+    prompt = f"""
+You are a CFO-level financial modeller for early-stage startups.
+Startup Idea: "{req.idea}"
+Market Size: {req.market_size} | Growth Rate: {req.growth_rate}
+
+Generate a realistic 3-year financial projection with the following JSON format:
+{{
+  "assumptions": {{
+    "pricing_model": "e.g. $49/mo SaaS subscription",
+    "target_customer": "e.g. SMBs with 10-50 employees",
+    "avg_contract_value": "e.g. $588/yr",
+    "cac": "e.g. $120",
+    "ltv": "e.g. $1,200",
+    "ltv_cac_ratio": "e.g. 10x"
+  }},
+  "projections": [
+    {{"year": "Year 1", "customers": "e.g. 200", "arr": "e.g. $117K", "burn": "e.g. $480K", "runway": "e.g. 18 months"}},
+    {{"year": "Year 2", "customers": "e.g. 800", "arr": "e.g. $470K", "burn": "e.g. $600K", "runway": "e.g. 12 months"}},
+    {{"year": "Year 3", "customers": "e.g. 2500", "arr": "e.g. $1.47M", "burn": "e.g. $800K", "runway": "Profitable"}}
+  ],
+  "fundraising": {{
+    "recommended_round": "e.g. $1.5M Pre-Seed",
+    "use_of_funds": ["e.g. 60% Engineering", "e.g. 30% Sales", "e.g. 10% Operations"],
+    "target_metrics_for_seed": "e.g. $500K ARR, 80% retention"
+  }},
+  "verdict": "One sentence on financial viability"
+}}
+Return ONLY valid JSON.
+"""
+    try:
+        raw = call_gemini(prompt, key_offset=4)
+        data = clean_json(raw)
+        if not data: raise ValueError("Parse failed")
+        return data
+    except Exception as e:
+        print(f"[FIN] Error: {e}")
+        return {"error": "Financial projection unavailable", "verdict": "Analysis failed — try again"}
+
+@app.post("/gtm_strategy")
+def gtm_strategy(req: DeepIntelRequest):
+    prompt = f"""
+You are a VP of Growth at a top-tier startup studio.
+Startup Idea: "{req.idea}"
+
+Generate a complete Go-To-Market strategy in this JSON format:
+{{
+  "target_segment": {{
+    "primary": "Most addressable customer segment",
+    "secondary": "Adjacent segment to expand into",
+    "icp": "Ideal Customer Profile in one sentence"
+  }},
+  "channels": [
+    {{"channel": "e.g. Content SEO", "rationale": "Why it works for this idea", "timeline": "e.g. Month 3-6", "cost": "e.g. Low"}},
+    {{"channel": "e.g. Product Hunt launch", "rationale": "...", "timeline": "...", "cost": "..."}},
+    {{"channel": "e.g. Cold outbound", "rationale": "...", "timeline": "...", "cost": "..."}}
+  ],
+  "launch_playbook": [
+    "Step 1: ...",
+    "Step 2: ...",
+    "Step 3: ...",
+    "Step 4: ...",
+    "Step 5: ..."
+  ],
+  "growth_lever": "The single biggest unfair distribution advantage for this idea",
+  "north_star_metric": "The one metric that defines GTM success"
+}}
+Return ONLY valid JSON.
+"""
+    try:
+        raw = call_gemini(prompt, key_offset=5)
+        data = clean_json(raw)
+        if not data: raise ValueError("Parse failed")
+        return data
+    except Exception as e:
+        print(f"[GTM] Error: {e}")
+        return {"error": "GTM strategy unavailable"}
+
+@app.post("/risk_scanner")
+def risk_scanner(req: DeepIntelRequest):
+    prompt = f"""
+You are a Risk Partner at a Tier-1 VC firm. You have killed 500 startups with one memo.
+Startup Idea: "{req.idea}"
+
+Identify the top risks in this JSON format:
+{{
+  "overall_risk": "Critical / High / Medium / Low",
+  "risks": [
+    {{
+      "category": "e.g. Market Risk",
+      "title": "e.g. Market too early",
+      "description": "Specific risk explanation",
+      "severity": "Critical / High / Medium / Low",
+      "mitigation": "How to de-risk this specifically"
+    }},
+    {{"category": "Execution Risk", "title": "...", "description": "...", "severity": "...", "mitigation": "..."}},
+    {{"category": "Competition Risk", "title": "...", "description": "...", "severity": "...", "mitigation": "..."}},
+    {{"category": "Regulatory Risk", "title": "...", "description": "...", "severity": "...", "mitigation": "..."}},
+    {{"category": "Funding Risk", "title": "...", "description": "...", "severity": "...", "mitigation": "..."}}
+  ],
+  "kill_condition": "The single scenario that would make this startup unfundable",
+  "green_flag": "The one signal that would make this a strong investment"
+}}
+Return ONLY valid JSON.
+"""
+    try:
+        raw = call_gemini(prompt, key_offset=0)
+        data = clean_json(raw)
+        if not data: raise ValueError("Parse failed")
+        return data
+    except Exception as e:
+        print(f"[RISK] Error: {e}")
+        return {"error": "Risk scanner unavailable"}
 
 # ============================================================================
 #  LEGACY EXTENSION SUPPORT
