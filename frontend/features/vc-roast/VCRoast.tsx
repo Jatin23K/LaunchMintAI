@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { 
-    ChevronRight, Loader2, ArrowLeft, AlertTriangle, Skull, Flame 
-} from 'lucide-react';
+import api from '../../services/api';
+import { ChevronRight, Loader2, ArrowLeft, AlertTriangle, Skull, Flame } from 'lucide-react';
 import { VCRoastData } from '../../types';
+import { API_BASE_URL } from '../../config';
 
 function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 'idle' | 'processing' | 'active') => void }) {
     const [input, setInput] = useState('');
@@ -23,8 +22,7 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
         setLoading(true); setData(null);
         setStatus('processing');
         try {
-            const apiBase = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8000';
-            const response = await axios.post(`${apiBase}/vc_roast`, { user_idea: text });
+            const response = await api.post(`/vc_roast`, { user_idea: text }, { retry: 2 } as any);
             setData(response.data);
             setStatus('active');
         } catch (err) {

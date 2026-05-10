@@ -4,7 +4,6 @@
 
 LaunchMintAI is a production-grade research engine combining dual-layer search grounding, parallel agentic analysis, and an applied ML intelligence layer to validate startup ideas before a single line of product code is written.
 
-![LaunchMintAI Banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-launch--mint--ai.vercel.app-brightgreen)](https://launch-mint-ai.vercel.app)
 [![DS Eval Pipeline](https://github.com/Jatin23K/LaunchMintAI/actions/workflows/ds-eval.yml/badge.svg)](https://github.com/Jatin23K/LaunchMintAI/actions/workflows/ds-eval.yml)
@@ -33,15 +32,14 @@ Most startup validators give you vibes. LaunchMintAI gives you data.
 
 ---
 
-## Core Intelligence Modules
+## 4 Core Tabs
 
-| Module | What It Does |
-|--------|-------------|
-| **Validator** | TAM/SAM/SOM extraction, CAGR grounding, adversarial audit, DS Intelligence Layer |
-| **War Room** | 6-layer forensic competitor analysis: funding, management, product, tech stack, sentiment, kill strategy |
-| **VC Roast** | Ruthless fatal flaw analysis — if your idea survives the roast, it might survive the market |
-| **Pitch Forge** | High-conversion taglines, elevator pitches, cold email hooks, value propositions |
-| **Delta Analysis** | Strategic comparison between two ideas from your archive |
+| Tab | What It Does |
+|-----|-------------|
+| **Validator** | TAM/SAM/SOM extraction, CAGR grounding, adversarial audit, DS Intelligence Layer + full forensic competitor analysis (kill strategies, SWOT, funding intel) |
+| **VC Roast** | Ruthless fatal flaw analysis grounded in live Tavily competitor data — if your idea survives, it might survive the market |
+| **Pitch Forge** | High-conversion taglines, elevator pitches, cold email hooks, value propositions — seeded with real market numbers from the Validator cache |
+| **Battle Room** | Compare Arena — pit two validated ideas head-to-head across 5 dimensions, AI declares a winner |
 
 ---
 
@@ -124,7 +122,7 @@ backend/app/ds/eval/
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- [Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
+- Gemini API key (free tier works)
 - [Tavily API key](https://tavily.com) (free tier: 1,000 searches/month)
 
 ### Backend
