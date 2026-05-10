@@ -1,0 +1,8 @@
+xgboost==2.0.3
+scikit-learn==1.4.2
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.13.0
+joblib==1.4.2
+vaderSentiment==3.3.2
+sentence-transformers==2.7.0

@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Rocket, Sparkles, Flame, Presentation, Briefcase, Activity, CheckCircle2
+import {
+    Rocket, Sparkles, Flame, Presentation, Activity, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Components
 import NeuralBackground from './components/NeuralBackground';
 import { LeftHud, RightHud, RecentIntel } from './components/HUD';
+import HistoryDrawer from './components/HistoryDrawer';
 
 // Features
 import ValidatorApp from './features/validator/Validator';
 import VCRoastApp from './features/vc-roast/VCRoast';
 import PitchForgeApp from './features/pitch-forge/PitchForge';
-import WarRoomApp from './features/war-room/WarRoom';
 import DeltaAnalysisApp from './features/delta-analysis/DeltaAnalysis';
 
 // Types
 import { RealData } from './types';
+import { Clock as ClockIcon } from 'lucide-react';
 
 // --- GLOBAL STYLES ---
 const globalStyles = `
@@ -44,13 +45,20 @@ const globalStyles = `
 `;
 
 export default function App() {
-    const [screen, setScreen] = useState<'VALIDATOR' | 'VC_ROAST' | 'PITCH_FORGE' | 'WAR_ROOM' | 'BATTLE_ROOM'>('VALIDATOR');
+    const [screen, setScreen] = useState<'VALIDATOR' | 'VC_ROAST' | 'PITCH_FORGE' | 'BATTLE_ROOM'>('VALIDATOR');
     const [activeReport, setActiveReport] = useState<RealData | null>(null);
     const [systemStatus, setSystemStatus] = useState<'idle' | 'processing' | 'active'>('idle');
     const [showSaveToast, setShowSaveToast] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [archive, setArchive] = useState<RealData[]>(() => {
-        const saved = localStorage.getItem('launchmint_archive');
-        return saved ? JSON.parse(saved) : [];
+        try {
+            const saved = localStorage.getItem('launchmint_archive');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            console.error('Failed to parse archive from localStorage:', e);
+            localStorage.removeItem('launchmint_archive');
+            return [];
+        }
     });
 
     useEffect(() => {
@@ -61,10 +69,14 @@ export default function App() {
         if (!report.idea) return;
         setArchive(prev => {
             if (prev.find(a => a.idea === report.idea)) return prev;
-            return [report, ...prev].slice(0, 10);
+            return [report, ...prev].slice(0, 50);
         });
         setShowSaveToast(true);
         setTimeout(() => setShowSaveToast(false), 3000);
+    };
+
+    const deleteFromArchive = (idea: string) => {
+        setArchive(prev => prev.filter(a => a.idea !== idea));
     };
 
     const getThemeColor = () => {
@@ -72,7 +84,6 @@ export default function App() {
             case 'VALIDATOR': return 'emerald';
             case 'VC_ROAST': return 'red';
             case 'PITCH_FORGE': return 'amber';
-            case 'WAR_ROOM': return 'violet';
             case 'BATTLE_ROOM': return 'cyan';
             default: return 'emerald';
         }
@@ -86,6 +97,18 @@ export default function App() {
 
             <LeftHud status={systemStatus} />
             <RightHud status={systemStatus} />
+            
+            <HistoryDrawer 
+                isOpen={isHistoryOpen} 
+                onClose={() => setIsHistoryOpen(false)} 
+                archive={archive} 
+                onDelete={deleteFromArchive}
+                onSelect={(r) => {
+                    setScreen('VALIDATOR');
+                    setActiveReport(r);
+                    setSystemStatus('active');
+                }}
+            />
 
             <AnimatePresence>
                 {showSaveToast && (
@@ -101,7 +124,7 @@ export default function App() {
                 )}
             </AnimatePresence>
 
-            <div className="no-print relative z-50 w-full px-6 md:px-8 pt-6 flex justify-center md:justify-start items-center">
+            <div className="no-print relative z-50 w-full px-6 md:px-8 pt-6 flex justify-between items-center">
                 <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -110,6 +133,15 @@ export default function App() {
                     <Rocket className="w-6 h-6 md:w-8 md:h-8 text-purple-500" />
                     <span>Launchmint <span className="text-slate-400">AI</span></span>
                 </motion.div>
+
+                <motion.button
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    onClick={() => setIsHistoryOpen(true)}
+                    className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition-all shadow-xl backdrop-blur-md group"
+                >
+                    <ClockIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                </motion.button>
             </div>
 
             <main className="flex-1 flex flex-col items-center justify-center w-full relative z-10 pt-20">
@@ -118,8 +150,7 @@ export default function App() {
                         { id: 'VALIDATOR', icon: Sparkles, label: 'Validator', color: 'text-emerald-400' },
                         { id: 'VC_ROAST', icon: Flame, label: 'Roast', color: 'text-red-400' },
                         { id: 'PITCH_FORGE', icon: Presentation, label: 'Forge', color: 'text-amber-400' },
-                        { id: 'WAR_ROOM', icon: Briefcase, label: 'War Room', color: 'text-violet-400' },
-                        { id: 'BATTLE_ROOM', icon: Activity, label: 'Delta', color: 'text-cyan-400' }
+                        { id: 'BATTLE_ROOM', icon: Activity, label: 'Battle Room', color: 'text-cyan-400' }
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -162,7 +193,6 @@ export default function App() {
                             )}
                             {screen === 'VC_ROAST' && <VCRoastApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
                             {screen === 'PITCH_FORGE' && <PitchForgeApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
-                            {screen === 'WAR_ROOM' && <WarRoomApp onBack={() => setScreen('VALIDATOR')} onSave={saveToArchive} setStatus={setSystemStatus} />}
                             {screen === 'BATTLE_ROOM' && <DeltaAnalysisApp archive={archive} setArchive={setArchive} />}
                         </motion.div>
                     </AnimatePresence>
