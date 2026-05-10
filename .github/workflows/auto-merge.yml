@@ -1,0 +1,28 @@
+name: Auto Merge PR to Master
+
+on:
+  workflow_run:
+    workflows: ["DS Eval Pipeline"]
+    types: [completed]
+    branches: [feature/parallel-agents]
+
+jobs:
+  auto-merge:
+    name: Merge to Master
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Merge feature branch into master
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout master
+          git merge origin/feature/parallel-agents --no-ff -m "Auto-merge: Phase 1-3 complete via GitHub Actions"
+          git push origin master
