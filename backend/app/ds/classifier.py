@@ -295,7 +295,7 @@ def train_and_save() -> XGBClassifier:
 
 
 def load_model() -> XGBClassifier:
-    if MODEL_PATH.exists():
+    if os.path.exists(str(MODEL_PATH)):
         print("[CLASSIFIER] Loading saved model from pkl...")
         return joblib.load(MODEL_PATH)
     return train_and_save()

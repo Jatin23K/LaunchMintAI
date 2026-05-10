@@ -4,7 +4,7 @@ import { RealData } from '../types';
 const ForensicReport = forwardRef<HTMLDivElement, { data: RealData, input: string }>((props, ref) => {
     const { data, input } = props;
     return (
-        <div ref={ref} className="p-12 bg-white text-slate-900 min-h-screen" style={{ width: '800px', margin: '0 auto', position: 'absolute', left: '-9999px', top: 0 }}>
+        <div ref={ref} className="p-12 bg-white text-slate-900 min-h-screen" style={{ width: '800px', position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -9999 }}>
             <div className="border-b-8 border-slate-900 pb-8 mb-12">
                 <div className="flex justify-between items-end">
                     <div>

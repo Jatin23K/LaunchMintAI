@@ -49,7 +49,7 @@ const SurvivalCard = ({ survival }: { survival: DSInsightsData['survival'] }) =>
                 </div>
                 <div>
                     <h3 className="text-sm font-black text-white uppercase tracking-widest">ML Survival Prediction</h3>
-                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">XGBoost · 10k synthetic startups</p>
+                    <p className="text-[10px] text-amber-500/70 font-mono mt-0.5">⚠ Heuristic model · indicative only</p>
                 </div>
             </div>
 
