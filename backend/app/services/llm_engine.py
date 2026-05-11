@@ -68,6 +68,11 @@ class DSInsightsRequest(BaseModel):
 class VCRoastRequest(BaseModel):
     user_idea: str
 
+@app.get("/health")
+def health_check():
+    """Lightweight warmup endpoint — called on frontend load to pre-wake Render free tier."""
+    return {"status": "ok", "service": "LaunchMintAI Backend"}
+
 @app.post("/ds_insights")
 async def ds_insights(req: DSInsightsRequest):
     try:
