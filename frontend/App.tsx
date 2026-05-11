@@ -18,6 +18,7 @@ import DeltaAnalysisApp from './features/delta-analysis/DeltaAnalysis';
 // Types
 import { RealData } from './types';
 import { Clock as ClockIcon } from 'lucide-react';
+import { warmupBackend } from './services/api';
 
 // --- GLOBAL STYLES ---
 const globalStyles = `
@@ -60,6 +61,11 @@ export default function App() {
             return [];
         }
     });
+
+    // Fire-and-forget warmup ping on app load so Render backend wakes before first real request
+    useEffect(() => {
+        warmupBackend();
+    }, []);
 
     useEffect(() => {
         localStorage.setItem('launchmint_archive', JSON.stringify(archive));
