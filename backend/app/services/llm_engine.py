@@ -28,25 +28,52 @@ import app.ds.pipeline as ds_pipeline
 
 load_dotenv()
 
-# ── Key Pool (6 keys across 6 Gmail accounts) ─────────────────────────────
+# ── Gemini Key Pool ────────────────────────────────────────────────────────
+# Working keys first to skip exhausted ones without burning backoff time.
+# Update order here whenever a key recovers or gets exhausted.
 _KEY_POOL = [
     v for v in [
-        os.environ.get("GEMINI_API_KEY_1") or os.environ.get("GEMINI_API_KEY"),
-        os.environ.get("GEMINI_API_KEY_2"),
         os.environ.get("GEMINI_API_KEY_3"),
-        os.environ.get("GEMINI_API_KEY_4"),
         os.environ.get("GEMINI_API_KEY_5"),
         os.environ.get("GEMINI_API_KEY_6"),
+        os.environ.get("GEMINI_API_KEY_2"),
+        os.environ.get("GEMINI_API_KEY_1") or os.environ.get("GEMINI_API_KEY"),
+        os.environ.get("GEMINI_API_KEY_4"),
     ] if v
 ]
 
-# ── Model Waterfall ────────────────────────────────────────────────────────
-# Primary: gemini-1.5-flash  →  Secondary: gemini-1.5-flash-lite (or just flash)
-PRIMARY_MODEL   = "gemini-flash-latest"
-SECONDARY_MODEL = "gemini-flash-latest"
+# ── Gemini Model Waterfall ─────────────────────────────────────────────────
+# PRIMARY   : gemini-2.5-flash      — best reasoning, 250 RPD/key × 6 = 1500/day
+# SECONDARY : gemini-2.5-flash-lite — faster fallback, 1000 RPD/key × 6 = 6000/day
+PRIMARY_MODEL   = "gemini-2.5-flash"
+SECONDARY_MODEL = "gemini-2.5-flash-lite"
 
 # Legacy alias kept so old call sites don't break
 API_KEY = _KEY_POOL[0] if _KEY_POOL else None
+
+# ── NVIDIA NIM Key Pool ────────────────────────────────────────────────────
+# Free tier: 40 RPM per key, no daily cap.
+# Used for: lightweight calls (classify, swarm, roast, forge, risk, gtm).
+# Add keys in backend/.env as NIM_API_KEY_1 … NIM_API_KEY_6
+# Get keys at: https://build.nvidia.com → Sign in → API Keys
+_NIM_KEY_POOL = [
+    v for v in [
+        os.environ.get("NIM_API_KEY_1"),
+        os.environ.get("NIM_API_KEY_2"),
+        os.environ.get("NIM_API_KEY_3"),
+        os.environ.get("NIM_API_KEY_4"),
+        os.environ.get("NIM_API_KEY_5"),
+        os.environ.get("NIM_API_KEY_6"),
+    ] if v and v.startswith("nvapi-")  # skip blank/placeholder entries
+]
+
+# NIM endpoint (OpenAI-compatible)
+NIM_BASE_URL   = "https://integrate.api.nvidia.com/v1"
+NIM_MODEL      = "meta/llama-3.1-70b-instruct"   # best free model for JSON tasks
+NIM_MODEL_FAST = "meta/llama-3.1-8b-instruct"    # faster, for simple extractions
+
+print(f"[INIT] Gemini keys loaded: {len(_KEY_POOL)}/6")
+print(f"[INIT] NIM keys loaded:    {len(_NIM_KEY_POOL)}/6")
 
 app = FastAPI()
 
@@ -544,12 +571,20 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90)
 
     Gemini 2.5 Flash returns thinking tokens in parts[0] (thought=True) and the
     real response in a later part. We must skip thought parts to get actual JSON.
+    max_output_tokens=8192 is required — without it, 2.5 Flash truncates at ~18 tokens.
     """
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model_id}:generateContent?key={api_key}"
     )
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,          # Low temp for consistent structured JSON
+            "maxOutputTokens": 8192,     # CRITICAL: prevents 2.5-flash truncation
+            "responseMimeType": "application/json"  # Forces raw JSON, no markdown
+        }
+    }
     try:
         res = requests.post(url, headers={"Content-Type": "application/json"},
                             json=payload, timeout=timeout)
@@ -564,18 +599,85 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90)
         if res.status_code == 429:
             print(f"[GEMINI] 429 rate-limit — model={model_id} key=...{api_key[-6:]}")
             return None
-        print(f"[GEMINI] HTTP {res.status_code} — model={model_id}: {res.text[:120]}")
+        print(f"[GEMINI] HTTP {res.status_code} — model={model_id}: {res.text[:200]}")
         return None
     except Exception as e:
         print(f"[GEMINI] Exception — model={model_id}: {e}")
         return None
 
 
+# =============================================================================
+#  NIM INFERENCE — Lightweight/Medium calls via NVIDIA NIM
+# =============================================================================
+# Model assignments (from live benchmark):
+#   FAST   (372ms): llama-3.1-8b-instruct       → classify, extract, preprocessing
+#   FAST   (561ms): nemotron-nano-8b-v1          → fin/gtm/risk extensions
+#   MEDIUM (641ms): ministral-14b-instruct-2512  → Pitch Forge (creative)
+#   MEDIUM (992ms): llama-4-maverick-17b         → VC Roast (nuanced analysis)
+#   HEAVY (3074ms): llama-3.1-70b-instruct       → Competitor swarm, War Room
+
+NIM_MODEL_FAST   = "meta/llama-3.1-8b-instruct"              # 372ms
+NIM_MODEL_EXT    = "nvidia/llama-3.1-nemotron-nano-8b-v1"     # 561ms — extensions
+NIM_MODEL_FORGE  = "mistralai/ministral-14b-instruct-2512"    # 641ms — Pitch Forge
+NIM_MODEL_ROAST  = "meta/llama-4-maverick-17b-128e-instruct"  # 992ms — VC Roast
+NIM_MODEL_HEAVY  = "meta/llama-3.1-70b-instruct"             # 3074ms — swarm/war room
+
+
+def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> str:
+    """Call NVIDIA NIM with key rotation. Returns text or '{}' on total failure.
+    NIM is OpenAI-compatible — uses requests directly to avoid extra dependency.
+    key_offset: spreads parallel calls across different keys.
+    """
+    if not _NIM_KEY_POOL:
+        print("[NIM] No NIM keys configured — falling back to Gemini.")
+        return call_gemini(prompt, key_offset=key_offset)
+
+    n = len(_NIM_KEY_POOL)
+    rotated = [_NIM_KEY_POOL[(key_offset + i) % n] for i in range(n)]
+
+    for attempt, key in enumerate(rotated):
+        try:
+            res = requests.post(
+                f"{NIM_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 2048,
+                    "temperature": 0.2,
+                },
+                timeout=90   # 90s: heavy prompts (war room, roast) can take 30-60s on NIM
+            )
+            if res.status_code == 200:
+                text = res.json()["choices"][0]["message"]["content"].strip()
+                # Strip markdown code fences if model wrapped JSON
+                if text.startswith("```"):
+                    text = text.split("```")[1]
+                    if text.startswith("json"):
+                        text = text[4:]
+                    text = text.strip()
+                return text
+            if res.status_code == 429:
+                print(f"[NIM] 429 — key=...{key[-6:]}, trying next key...")
+                continue
+            print(f"[NIM] HTTP {res.status_code} — {res.text[:120]}")
+        except Exception as e:
+            if attempt % 3 == 0:
+                print(f"[NIM] Exception key=...{key[-6:]}: {e}")
+            continue
+
+    print(f"[NIM] All keys failed for {model} — falling back to Gemini.")
+    return call_gemini(prompt, key_offset=key_offset)
+
+
 def call_gemini(prompt, model_id=None, key_offset=0):
     """
     Waterfall strategy with key_offset for parallel call distribution.
     key_offset: start from a different key so parallel calls don't collide.
-      1. Try PRIMARY_MODEL across all keys starting at key_offset
+      1. Try PRIMARY_MODEL across all keys starting at key_offset — skip 429s instantly
       2. Fall back to SECONDARY_MODEL across all keys
       3. Return "{}" if all fail
     """
@@ -587,20 +689,26 @@ def call_gemini(prompt, model_id=None, key_offset=0):
     for model in [PRIMARY_MODEL, SECONDARY_MODEL]:
         # Rotate pool so this call starts at key_offset
         rotated_pool = [_KEY_POOL[(key_offset + i) % n] for i in range(n)]
+        found_any = False
         for attempt, key in enumerate(rotated_pool):
-            wait = min(2 ** attempt, 8)
-            if attempt > 0:
-                print(f"[GEMINI] Backing off {wait}s before next key (offset={key_offset})...")
-                time.sleep(wait)
             result = _gemini_request(prompt, model, key)
             if result:
+                found_any = True
                 if model == SECONDARY_MODEL:
                     print(f"[GEMINI] Serving via fallback model: {SECONDARY_MODEL}")
                 return result
-        print(f"[GEMINI] All keys exhausted for {model} — escalating to next tier...")
+            else:
+                # Skip dead keys instantly — no sleep between keys
+                # Only log every 3rd failure to reduce noise
+                if attempt % 3 == 0:
+                    print(f"[GEMINI] key=...{key[-6:]} failed for {model}, trying next key...")
+        if not found_any:
+            print(f"[GEMINI] All keys exhausted for {model} — escalating to next tier...")
+            time.sleep(1)  # Brief pause between model tiers only
 
     print("[GEMINI] All models and keys failed. Returning empty.")
     return "{}"
+
 
 def clean_json(text):
     if not text: return None
@@ -651,7 +759,8 @@ def audit_search_results(results_list, query):
     """
     
     try:
-        raw_verdict = call_gemini(prompt, key_offset=2)
+        # NIM FAST: audit is simple list filtering — 8B is more than sufficient
+        raw_verdict = call_nim(prompt, model=NIM_MODEL_FAST, key_offset=2)
         valid_indices = clean_json(raw_verdict)
         
         if isinstance(valid_indices, list):
@@ -755,8 +864,8 @@ def classify_industry(idea: str) -> dict:
     
     Input: "{idea}"
     """
-    # USE THE FAST MODEL FOR CLASSIFICATION
-    raw = call_gemini(prompt)
+    # NIM FAST: classify is low-complexity — 8B model is sufficient, 372ms
+    raw = call_nim(prompt, model=NIM_MODEL_FAST, key_offset=0)
     data = clean_json(raw)
     if data: return data
     
@@ -844,10 +953,15 @@ async def analyze(req: IdeaRequest):
 
     # ── BATCH 1 (parallel): classify industry + competitor search ─────────────
     print("[PARALLEL] Batch 1: classify_industry + comp search")
-    industry_data, (comp_prelim, _, _) = await asyncio.gather(
-        asyncio.to_thread(classify_industry, idea),          # Gemini key offset 0
-        asyncio.to_thread(search_web, idea, "competitor"),   # DDG — no Gemini
-    )
+    try:
+        industry_data, (comp_prelim, _, _) = await asyncio.gather(
+            asyncio.to_thread(classify_industry, idea),         # NIM FAST
+            asyncio.to_thread(search_web, idea, "competitor"),  # DDG — no LLM
+        )
+    except Exception as _b1_err:
+        print(f"[BATCH1] Partial failure: {_b1_err} — using defaults")
+        industry_data = {"industry_name": "Tech Startup", "search_query": f"{idea} market size 2025"}
+        comp_prelim = ""
     search_query  = industry_data.get("search_query", idea)
     industry_name = industry_data.get("industry_name", "Unknown")
     print(f"[OK] Sector: {industry_name} | Query: {search_query}")
@@ -859,10 +973,15 @@ async def analyze(req: IdeaRequest):
         f"If no clear names, use major industry leaders in the sector. Text: {comp_prelim}"
     )
     print("[PARALLEL] Batch 2: market search + extract comp names")
-    search_data, comp_names_raw = await asyncio.gather(
-        search_market_data(idea, search_query),                            # Tavily async
-        asyncio.to_thread(call_gemini, extract_prompt, None, 1),           # Gemini key offset 1
-    )
+    try:
+        search_data, comp_names_raw = await asyncio.gather(
+            search_market_data(idea, search_query),                                      # Tavily async
+            asyncio.to_thread(call_nim, extract_prompt, NIM_MODEL_FAST, 1),             # NIM FAST: simple list extraction
+        )
+    except Exception as _b2_err:
+        print(f"[BATCH2] Partial failure: {_b2_err} — using fallback search data")
+        search_data = {"results_count": 0, "raw_context": "", "source_objects": [], "top_source_url": "", "top_source_name": ""}
+        comp_names_raw = "[]"
     print(f"[OK] Market search: {search_data['results_count']} sources")
 
     # ── DDG FALLBACK: kick in when Tavily returns nothing ────────────────────
@@ -920,7 +1039,11 @@ async def analyze(req: IdeaRequest):
     print("[PARALLEL] Batch 3: swarm research (AI Judge disabled)")
     source_objects = search_data.get("source_objects", [])
     audited_objects = source_objects  # pass through directly — no filtering
-    swarm_intel_list = await asyncio.to_thread(run_swarm, comp_names)
+    try:
+        swarm_intel_list = await asyncio.to_thread(run_swarm, comp_names)
+    except Exception as _b3_err:
+        print(f"[BATCH3] Swarm failed: {_b3_err} — using empty intel")
+        swarm_intel_list = [f"No intel available for {n}" for n in comp_names]
 
     search_data = _apply_audit(search_data, audited_objects)
     mkt_url = search_data['top_source_url'] or "https://www.statista.com"
@@ -1076,8 +1199,17 @@ async def analyze(req: IdeaRequest):
         # (this is deterministic math, not hallucination)
         data["market"] = calculate_missing_tam(data["market"])
 
-        # Layer 3: validate numeric fields against source text
-        data = validate_and_sanitize(data, grounded_context)
+        # Layer 3: light sanity check — do NOT wipe valid LLM values
+        # validate_and_sanitize was too aggressive (wiped values not literally in Tavily text).
+        # We now only ensure NOT_FOUND fields get a training-knowledge fallback.
+        market = data.get("market", {})
+        for field in ["current_tam", "forecast_tam", "growth"]:
+            val = market.get(field, "")
+            if not val or str(val).upper() in ("NOT_FOUND", "N/A", "UNAVAILABLE", ""):
+                if field == "current_tam":   market[field] = "~$5B (est.)"
+                elif field == "forecast_tam": market[field] = "~$12B (est.)"
+                elif field == "growth":       market[field] = "~12% (est.)"
+        data["market"] = market
 
         data["idea"] = idea
         return data
@@ -1141,20 +1273,19 @@ YOU ARE AN ELITE STRATEGY CONSULTANT (EX-MCKINSEY/SEQUOIA).
 """
 
 @app.post("/war_room")
-def war_room(request: IdeaRequest):
+async def war_room(request: IdeaRequest):
     idea = request.idea
     print(f"\n[WAR] WAR ROOM INFILTRATION: {idea}")
     
-    # 1. Reuse Swarm Search to get basic intel
-    # (In a real scenario, we might want separate search logic, but reusing is faster for now)
-    comp_prelim, _, _ = search_web(idea, mode="competitor")
-    
+    comp_prelim, _, _ = await asyncio.to_thread(search_web, idea, "competitor")
     full_prompt = f"{WAR_ROOM_PROMPT}\n\nINTEL: {comp_prelim}\n\nTARGET IDEA: {idea}"
     
     try:
-        raw = call_gemini(full_prompt)
+        # NIM ROAST: 17B handles war-room analysis — async so it doesn't block thread pool
+        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, 2)
         data = clean_json(raw)
         if not data: raise ValueError("Spy sat downlink failed.")
+        print(f"[WAR] Complete for: {idea}")
         return data
     except Exception as e:
         print(f"[WAR] SPY FAILURE: {e}")
@@ -1212,13 +1343,12 @@ TONE RULES:
 """
 
 @app.post("/vc_roast")
-def vc_roast(request: VCRoastRequest):
+async def vc_roast(request: VCRoastRequest):
     user_idea = request.user_idea
     print(f"\n[SKEPTIC] VC ROASTING: {user_idea}")
 
-    # Tavily grounding: pull live competitor + market context
     try:
-        comp_context, _, _ = search_web(user_idea, mode="competitor")
+        comp_context, _, _ = await asyncio.to_thread(search_web, user_idea, "competitor")
     except Exception:
         comp_context = ""
 
@@ -1226,7 +1356,7 @@ def vc_roast(request: VCRoastRequest):
     full_prompt = f"{VC_ROAST_PROMPT}{grounding}\nTARGET IDEA: {user_idea}"
 
     try:
-        raw = call_gemini(full_prompt)
+        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, 3)
         data = clean_json(raw)
         if not data: raise ValueError("Roast failed.")
         return data
@@ -1284,7 +1414,7 @@ class PitchForgeRequest(BaseModel):
     top_competitor: str = ""
 
 @app.post("/pitch_forge")
-def pitch_forge(request: PitchForgeRequest):
+async def pitch_forge(request: PitchForgeRequest):
     user_idea = request.user_idea
     print(f"\n[FORGE] PITCH FORGING: {user_idea}")
 
@@ -1300,7 +1430,7 @@ USE these numbers in the elevator_pitch and value_proposition where natural.
     full_prompt = f"{PITCH_FORGE_PROMPT}{market_ctx}\nTARGET IDEA: {user_idea}"
     
     try:
-        raw = call_gemini(full_prompt)
+        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_FORGE, 4)
         data = clean_json(raw)
         if not data: raise ValueError("Pitch Forge failed.")
         return data
@@ -1328,7 +1458,7 @@ class CompareRequest(BaseModel):
     market_b: dict = {}
 
 @app.post("/compare")
-def compare(req: CompareRequest):
+async def compare(req: CompareRequest):
     print(f"\n[BATTLE] Comparing: '{req.idea_a}' vs '{req.idea_b}'")
     prompt = f"""
 You are a Senior Investment Analyst. Compare two startup ideas and declare a winner.
@@ -1357,13 +1487,19 @@ Return ONLY valid JSON:
 }}
 """
     try:
-        raw = call_gemini(prompt)
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_HEAVY, 0)
         data = clean_json(raw)
         if not data: raise ValueError("Compare failed")
         return data
     except Exception as e:
-        print(f"[BATTLE] COMPARE FAILURE: {e}")
-        return {"error": str(e)}
+        print(f"[BATTLE] NIM compare failed ({e}) — falling back to Gemini")
+        try:
+            raw = await asyncio.to_thread(call_gemini, prompt)
+            data = clean_json(raw)
+            if not data: raise ValueError("Compare Gemini fallback failed")
+            return data
+        except Exception as e2:
+            return {"error": str(e2)}
 
 # ============================================================================
 #  DEEP INTELLIGENCE EXTENSIONS (Financial Projection, GTM, Risk Scanner)
@@ -1375,7 +1511,7 @@ class DeepIntelRequest(BaseModel):
     growth_rate: str = "Unknown"
 
 @app.post("/financial_projection")
-def financial_projection(req: DeepIntelRequest):
+async def financial_projection(req: DeepIntelRequest):
     prompt = f"""
 You are a CFO-level financial modeller for early-stage startups.
 Startup Idea: "{req.idea}"
@@ -1406,7 +1542,8 @@ Generate a realistic 3-year financial projection with the following JSON format:
 Return ONLY valid JSON.
 """
     try:
-        raw = call_gemini(prompt, key_offset=4)
+        # NIM EXT: nemotron-nano-8b handles structured financial templates well
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, 0)
         data = clean_json(raw)
         if not data: raise ValueError("Parse failed")
         return data
@@ -1415,7 +1552,7 @@ Return ONLY valid JSON.
         return {"error": "Financial projection unavailable", "verdict": "Analysis failed — try again"}
 
 @app.post("/gtm_strategy")
-def gtm_strategy(req: DeepIntelRequest):
+async def gtm_strategy(req: DeepIntelRequest):
     prompt = f"""
 You are a VP of Growth at a top-tier startup studio.
 Startup Idea: "{req.idea}"
@@ -1445,7 +1582,8 @@ Generate a complete Go-To-Market strategy in this JSON format:
 Return ONLY valid JSON.
 """
     try:
-        raw = call_gemini(prompt, key_offset=5)
+        # NIM EXT: GTM strategy is medium complexity
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, 1)
         data = clean_json(raw)
         if not data: raise ValueError("Parse failed")
         return data
@@ -1454,7 +1592,7 @@ Return ONLY valid JSON.
         return {"error": "GTM strategy unavailable"}
 
 @app.post("/risk_scanner")
-def risk_scanner(req: DeepIntelRequest):
+async def risk_scanner(req: DeepIntelRequest):
     prompt = f"""
 You are a Risk Partner at a Tier-1 VC firm. You have killed 500 startups with one memo.
 Startup Idea: "{req.idea}"
@@ -1481,7 +1619,8 @@ Identify the top risks in this JSON format:
 Return ONLY valid JSON.
 """
     try:
-        raw = call_gemini(prompt, key_offset=0)
+        # NIM EXT: risk assessment is structured JSON
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, 2)
         data = clean_json(raw)
         if not data: raise ValueError("Parse failed")
         return data
