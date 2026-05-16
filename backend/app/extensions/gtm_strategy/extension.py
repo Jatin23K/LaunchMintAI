@@ -1,11 +1,42 @@
-from app.services.llm_engine import llm
-import json
+from app.services.llm_engine import llm, call_gemini, _next_gemini_offset
+from app.extensions.parse_helper import safe_parse_json
+
+_ECHO_MARKERS = ["e.g.", "Monthly Active Brands", "LinkedIn Outreach"]
 
 class Extension:
     def execute(self, payload):
-        prompt = f"You are an expert AI consultant. Task: {payload}"
+        idea = payload.get('idea', str(payload))
+        market_size = payload.get('market_size', 'Unknown')
+
+        prompt = f"""You are a GTM strategist. Build a go-to-market plan for this startup.
+
+IDEA: {idea}
+MARKET SIZE: {market_size}
+
+RULES:
+- Every value MUST be specific to "{idea}". Generic placeholders are FORBIDDEN.
+- Channel names, CAC estimates, and timelines must reflect this specific market.
+- Do NOT copy example text — generate original values.
+
+Return ONLY valid JSON:
+{{
+  "north_star_metric": "<the key metric for this specific business>",
+  "icp": "<ideal customer profile in one sentence>",
+  "channels": [
+    {{"name": "<specific channel>", "cac": "<estimated cost>", "timeline": "<timeframe>", "priority": "High"}},
+    {{"name": "<specific channel>", "cac": "<estimated cost>", "timeline": "<timeframe>", "priority": "Medium"}},
+    {{"name": "<specific channel>", "cac": "<estimated cost>", "timeline": "<timeframe>", "priority": "Medium"}}
+  ],
+  "growth_lever": "<the single most powerful growth mechanism>",
+  "first_100_customers": "<specific tactic to get the first 100 paying customers>"
+}}"""
+
         result_json = llm.analyze(prompt)
-        try:
-            return json.loads(result_json)
-        except:
-            return {"error": "JSON Parse Error", "raw": result_json}
+        data = safe_parse_json(result_json)
+
+        if data and any(marker in str(data) for marker in _ECHO_MARKERS):
+            print(f"[GTM] Echo detected — retrying with Gemini")
+            result_json = call_gemini(prompt, key_offset=_next_gemini_offset())
+            data = safe_parse_json(result_json)
+
+        return data if data else {"error": "GTM strategy unavailable", "raw": result_json[:200] if result_json else ""}
