@@ -492,10 +492,11 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                 const mktSize = resultData.market?.forecast_tam || 'Unknown';
                 const growth = resultData.market?.growth || 'Unknown';
                 const extPayload = { idea: cleanedText, market_size: mktSize, growth_rate: growth };
+                const deepTimeout = { timeout: 90000 };
                 Promise.allSettled([
-                    api.post('/run', { extension_id: 'financial-projection', payload: extPayload }),
-                    api.post('/run', { extension_id: 'gtm-strategy', payload: extPayload }),
-                    api.post('/run', { extension_id: 'risk-scanner', payload: extPayload }),
+                    api.post('/run', { extension_id: 'financial-projection', payload: extPayload }, deepTimeout),
+                    api.post('/run', { extension_id: 'gtm-strategy', payload: extPayload }, deepTimeout),
+                    api.post('/run', { extension_id: 'risk-scanner', payload: extPayload }, deepTimeout),
                 ]).then(([finRes, gtmRes, riskRes]) => {
                     setDeepIntel({
                         fin: finRes.status === 'fulfilled' ? finRes.value.data?.data : null,
@@ -506,15 +507,16 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
 
                 // Fire extended intel in background — non-blocking (8 sections)
                 setExtIntelLoading(true);
+                const extTimeout = { timeout: 90000 };
                 Promise.allSettled([
-                    api.post('/run', { extension_id: 'user-persona', payload: { idea: cleanedText } }),
-                    api.post('/run', { extension_id: 'people-analysis', payload: { idea: cleanedText } }),
-                    api.post('/run', { extension_id: 'pricing-strategy', payload: extPayload }),
-                    api.post('/run', { extension_id: 'funding-readiness', payload: extPayload }),
-                    api.post('/run', { extension_id: 'legal-risks', payload: { idea: cleanedText } }),
-                    api.post('/run', { extension_id: 'traction-signals', payload: { idea: cleanedText } }),
-                    api.post('/run', { extension_id: 'moat-analysis', payload: { idea: cleanedText } }),
-                    api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }),
+                    api.post('/run', { extension_id: 'user-persona', payload: { idea: cleanedText } }, extTimeout),
+                    api.post('/run', { extension_id: 'people-analysis', payload: { idea: cleanedText } }, extTimeout),
+                    api.post('/run', { extension_id: 'pricing-strategy', payload: extPayload }, extTimeout),
+                    api.post('/run', { extension_id: 'funding-readiness', payload: extPayload }, extTimeout),
+                    api.post('/run', { extension_id: 'legal-risks', payload: { idea: cleanedText } }, extTimeout),
+                    api.post('/run', { extension_id: 'traction-signals', payload: { idea: cleanedText } }, extTimeout),
+                    api.post('/run', { extension_id: 'moat-analysis', payload: { idea: cleanedText } }, extTimeout),
+                    api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }, extTimeout),
                 ]).then(([personaRes, redFlagRes, pricingRes, fundingRes, legalRes, tractionRes, moatRes, exitRes]) => {
                     setExtIntel({
                         personas: personaRes.status === 'fulfilled' ? personaRes.value.data?.data : null,
@@ -948,6 +950,13 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     )}
                                     {deepIntelOpen === key && deepIntel?.[key as keyof typeof deepIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
+                                            {/* Error fallback for deep intel sections */}
+                                            {deepIntel[key as keyof typeof deepIntel]?.error && (
+                                                <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
+                                                    <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
+                                                    <p className="text-slate-400 text-xs">Analysis unavailable — LLM did not return valid data for this section.</p>
+                                                </div>
+                                            )}
                                             {key === 'fin' && deepIntel.fin && !deepIntel.fin.error && (
                                                 <div className="space-y-4">
                                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -1103,8 +1112,23 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                             </div>
                                         </div>
                                     )}
+                                    {extIntelOpen === key && !extIntel?.[key as keyof typeof extIntel] && !extIntelLoading && (
+                                        <div className="px-5 pb-6 border-t border-slate-800 pt-4">
+                                            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
+                                                <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
+                                                <p className="text-slate-400 text-xs">Extension timed out or failed to generate data.</p>
+                                            </div>
+                                        </div>
+                                    )}
                                     {extIntelOpen === key && extIntel?.[key as keyof typeof extIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
+                                            {/* Error fallback for any section */}
+                                            {extIntel[key as keyof typeof extIntel]?.error && (
+                                                <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
+                                                    <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
+                                                    <p className="text-slate-400 text-xs">Analysis unavailable — LLM did not return valid data for this section.</p>
+                                                </div>
+                                            )}
                                             {key === 'personas' && extIntel.personas && !extIntel.personas.error && (
                                                 <div className="space-y-3">
                                                     {(extIntel.personas.personas || []).map((p: any, i: number) => (
@@ -1221,23 +1245,23 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                             {key === 'exit' && extIntel.exit && !extIntel.exit.error && (
                                                 <div className="space-y-3">
                                                     <div className="flex items-center gap-4 mb-2">
-                                                        <span className="text-cyan-400 font-black text-sm">{extIntel.exit.most_likely_exit}</span>
-                                                        <span className="text-slate-400 text-[10px]">{extIntel.exit.timeline}</span>
-                                                        <span className="text-emerald-400 text-[10px] font-bold">{extIntel.exit.valuation_range}</span>
+                                                        <span className="text-cyan-400 font-black text-sm">{extIntel.exit.most_likely_exit || 'Acquisition'}</span>
+                                                        <span className="text-slate-400 text-[10px]">{extIntel.exit.timeline || ''}</span>
+                                                        <span className="text-emerald-400 text-[10px] font-bold">{extIntel.exit.valuation_range || ''}</span>
                                                     </div>
-                                                    {(extIntel.exit.scenarios || []).map((s: any, i: number) => (
+                                                    {Array.isArray(extIntel.exit.scenarios) && extIntel.exit.scenarios.map((s: any, i: number) => (
                                                         <div key={i} className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                                                             <div className="flex items-center justify-between mb-1">
-                                                                <span className="text-white font-bold text-xs">{s.type}</span>
-                                                                <span className="text-cyan-400 text-[10px]">{s.valuation} • {s.probability}</span>
+                                                                <span className="text-white font-bold text-xs">{s.type || s.name || 'Scenario'}</span>
+                                                                <span className="text-cyan-400 text-[10px]">{s.valuation || ''} • {s.probability || ''}</span>
                                                             </div>
-                                                            <p className="text-slate-400 text-[11px]">{s.reasoning}</p>
+                                                            <p className="text-slate-400 text-[11px]">{s.reasoning || s.description || ''}</p>
                                                         </div>
                                                     ))}
-                                                    {(extIntel.exit.likely_acquirers || []).length > 0 && (
+                                                    {Array.isArray(extIntel.exit.likely_acquirers) && extIntel.exit.likely_acquirers.length > 0 && (
                                                         <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                                                             <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Likely Acquirers</p>
-                                                            {extIntel.exit.likely_acquirers.map((a: string, i: number) => <p key={i} className="text-slate-300 text-[11px]">• {a}</p>)}
+                                                            {extIntel.exit.likely_acquirers.map((a: any, i: number) => <p key={i} className="text-slate-300 text-[11px]">• {typeof a === 'string' ? a : a?.name || JSON.stringify(a)}</p>)}
                                                         </div>
                                                     )}
                                                 </div>
