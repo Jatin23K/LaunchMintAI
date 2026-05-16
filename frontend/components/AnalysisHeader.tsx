@@ -40,7 +40,7 @@ const AnalysisHeader: React.FC<Props> = ({ idea, isSaved, onBack, onSave, onExpo
         </div>
       </div>
       <div className="text-center">
-        <h1 className="text-4xl md:text-7xl font-black text-white italic tracking-tighter leading-tight">{idea}</h1>
+        <h1 className="text-xl md:text-3xl font-black text-white tracking-tight leading-snug">{idea}</h1>
       </div>
     </div>
   );
