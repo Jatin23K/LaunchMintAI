@@ -57,6 +57,12 @@ from app.extensions.vision_north_star.extension import Extension as Vision
 from app.extensions.metrics_kpi.extension import Extension as KPI
 from app.extensions.legal_compliance.extension import Extension as Legal
 from app.extensions.document_intelligence.extension import Extension as DocIntel
+from app.extensions.pricing_strategy.extension import Extension as PricingStrategy
+from app.extensions.funding_readiness.extension import Extension as FundingReadiness
+from app.extensions.legal_risks.extension import Extension as LegalRisks
+from app.extensions.traction_signals.extension import Extension as TractionSignals
+from app.extensions.moat_analysis.extension import Extension as MoatAnalysis
+from app.extensions.exit_scenarios.extension import Extension as ExitScenarios
 print("[OK] IMPORTS SUCCESSFUL")
 
 # 3. REGISTER EXTENSIONS
@@ -78,7 +84,13 @@ EXTENSIONS = {
     'vision-north-star': Vision(),
     'metrics-kpi': KPI(),
     'legal-compliance': Legal(),
-    'document-intelligence': DocIntel()
+    'document-intelligence': DocIntel(),
+    'pricing-strategy': PricingStrategy(),
+    'funding-readiness': FundingReadiness(),
+    'legal-risks': LegalRisks(),
+    'traction-signals': TractionSignals(),
+    'moat-analysis': MoatAnalysis(),
+    'exit-scenarios': ExitScenarios()
 }
 
 @app.post("/run")

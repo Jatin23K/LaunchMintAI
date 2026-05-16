@@ -5,7 +5,7 @@ import {
     ChevronRight, TrendingUp, Users, Scale, Hammer,
     Megaphone, Briefcase, Rocket, Search, Clock,
     ExternalLink, Loader2, AlertTriangle, Link as LinkIcon,
-    Database, Sparkles, Info
+    Database, Sparkles, Info, DollarSign, Shield, Zap, Lock, Target
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -208,6 +208,9 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
     const [deepIntel, setDeepIntel] = useState<{ fin: any; gtm: any; risk: any } | null>(null);
     const [deepIntelLoading, setDeepIntelLoading] = useState(false);
     const [deepIntelOpen, setDeepIntelOpen] = useState<string | null>(null);
+    const [extIntel, setExtIntel] = useState<{ personas: any; redFlags: any; pricing: any; funding: any; legalRisks: any; traction: any; moat: any; exit: any } | null>(null);
+    const [extIntelLoading, setExtIntelLoading] = useState(false);
+    const [extIntelOpen, setExtIntelOpen] = useState<string | null>(null);
     const [warData, setWarData] = useState<any | null>(null);
     const [warRoomOpen, setWarRoomOpen] = useState<number | null>(null);
 
@@ -415,7 +418,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
             return;
         }
 
-        setLoading(true); setDsLoading(true); setData(null); setWarData(null); setError(null); setIsSaved(false); setIsFromCache(false);
+        setLoading(true); setDsLoading(true); setData(null); setWarData(null); setDeepIntel(null); setExtIntel(null); setDsData(null); setError(null); setIsSaved(false); setIsFromCache(false);
         setActiveDepartment('Product'); setSelectedCompetitor(null); setInput(cleanedText);
         setTerminalLogs([]); setLoadingMsg("🚀 Initializing AI Agents...");
         setStatus('processing');
@@ -443,9 +446,8 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
         const timeoutId = setTimeout(() => controller.abort(), 90000);
 
         try {
-            const [response, dsResponse, warResponse] = await Promise.allSettled([
+            const [response, warResponse] = await Promise.allSettled([
                 api.post(`/analyze`, { idea: cleanedText }, { signal: controller.signal, retry: 2 } as any),
-                api.post(`/ds_insights`, { idea: cleanedText, market_data: {}, competitors: [] }, { signal: controller.signal, retry: 2 } as any),
                 api.post(`/war_room`, { idea: cleanedText }, { signal: controller.signal } as any),
             ]);
 
@@ -458,9 +460,23 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                 const resultData = { ...response.value.data, idea: cleanedText, timestamp: Date.now() };
                 let resultDsData = null;
 
-                if (dsResponse.status === 'fulfilled') {
-                    resultDsData = dsResponse.value.data?.data || null;
+                // Fire ds_insights AFTER analyze so we can pass real competitor names
+                const competitors = (resultData.competitors || []).map((c: any) => c.name).filter(Boolean);
+                const marketData = resultData.market || {};
+                try {
+                    const dsResponse = await api.post(`/ds_insights`, {
+                        idea: cleanedText,
+                        market_data: { forecast_tam: marketData.forecast_tam, growth: marketData.growth },
+                        competitors
+                    });
+                    const raw = dsResponse.data?.data;
+                    if (raw && raw.survival && !raw.survival.error) {
+                        resultDsData = raw;
+                    }
+                } catch (dsErr) {
+                    console.warn('DS insights failed:', dsErr);
                 }
+
                 if (warResponse.status === 'fulfilled') {
                     setWarData(warResponse.value.data || null);
                 }
@@ -475,18 +491,42 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                 setDeepIntelLoading(true);
                 const mktSize = resultData.market?.forecast_tam || 'Unknown';
                 const growth = resultData.market?.growth || 'Unknown';
-                const payload = { idea: cleanedText, market_size: mktSize, growth_rate: growth };
+                const extPayload = { idea: cleanedText, market_size: mktSize, growth_rate: growth };
                 Promise.allSettled([
-                    api.post('/financial_projection', payload),
-                    api.post('/gtm_strategy', payload),
-                    api.post('/risk_scanner', payload),
+                    api.post('/run', { extension_id: 'financial-projection', payload: extPayload }),
+                    api.post('/run', { extension_id: 'gtm-strategy', payload: extPayload }),
+                    api.post('/run', { extension_id: 'risk-scanner', payload: extPayload }),
                 ]).then(([finRes, gtmRes, riskRes]) => {
                     setDeepIntel({
-                        fin: finRes.status === 'fulfilled' ? finRes.value.data : null,
-                        gtm: gtmRes.status === 'fulfilled' ? gtmRes.value.data : null,
-                        risk: riskRes.status === 'fulfilled' ? riskRes.value.data : null,
+                        fin: finRes.status === 'fulfilled' ? finRes.value.data?.data : null,
+                        gtm: gtmRes.status === 'fulfilled' ? gtmRes.value.data?.data : null,
+                        risk: riskRes.status === 'fulfilled' ? riskRes.value.data?.data : null,
                     });
                 }).finally(() => setDeepIntelLoading(false));
+
+                // Fire extended intel in background — non-blocking (8 sections)
+                setExtIntelLoading(true);
+                Promise.allSettled([
+                    api.post('/run', { extension_id: 'user-persona', payload: { idea: cleanedText } }),
+                    api.post('/run', { extension_id: 'people-analysis', payload: { idea: cleanedText } }),
+                    api.post('/run', { extension_id: 'pricing-strategy', payload: extPayload }),
+                    api.post('/run', { extension_id: 'funding-readiness', payload: extPayload }),
+                    api.post('/run', { extension_id: 'legal-risks', payload: { idea: cleanedText } }),
+                    api.post('/run', { extension_id: 'traction-signals', payload: { idea: cleanedText } }),
+                    api.post('/run', { extension_id: 'moat-analysis', payload: { idea: cleanedText } }),
+                    api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }),
+                ]).then(([personaRes, redFlagRes, pricingRes, fundingRes, legalRes, tractionRes, moatRes, exitRes]) => {
+                    setExtIntel({
+                        personas: personaRes.status === 'fulfilled' ? personaRes.value.data?.data : null,
+                        redFlags: redFlagRes.status === 'fulfilled' ? redFlagRes.value.data?.data : null,
+                        pricing: pricingRes.status === 'fulfilled' ? pricingRes.value.data?.data : null,
+                        funding: fundingRes.status === 'fulfilled' ? fundingRes.value.data?.data : null,
+                        legalRisks: legalRes.status === 'fulfilled' ? legalRes.value.data?.data : null,
+                        traction: tractionRes.status === 'fulfilled' ? tractionRes.value.data?.data : null,
+                        moat: moatRes.status === 'fulfilled' ? moatRes.value.data?.data : null,
+                        exit: exitRes.status === 'fulfilled' ? exitRes.value.data?.data : null,
+                    });
+                }).finally(() => setExtIntelLoading(false));
             } else {
                 if (response.reason.name === 'CanceledError' || response.reason.name === 'AbortError') {
                     throw new Error('TIMEOUT');
@@ -900,8 +940,11 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                                         {[
                                                             ['Pricing Model', deepIntel.fin.assumptions?.pricing_model],
-                                                            ['LTV/CAC', deepIntel.fin.assumptions?.ltv_cac_ratio],
+                                                            ['LTV/CAC Ratio', deepIntel.fin.assumptions?.ltv_cac_ratio],
+                                                            ['Gross Margin', deepIntel.fin.assumptions?.gross_margin],
+                                                            ['Payback Period', deepIntel.fin.assumptions?.payback_period],
                                                             ['Recommended Round', deepIntel.fin.fundraising?.recommended_round],
+                                                            ['Runway', deepIntel.fin.fundraising?.runway_months],
                                                         ].map(([k, v]) => (
                                                             <div key={k} className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                                                                 <div className="text-[10px] text-slate-500 font-black uppercase mb-1">{k}</div>
@@ -913,34 +956,61 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                                         {(deepIntel.fin.projections || []).map((p: any) => (
                                                             <div key={p.year} className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-center">
                                                                 <div className="text-[10px] text-slate-500 font-black uppercase mb-2">{p.year}</div>
-                                                                <div className="text-white font-black text-base">{p.arr}</div>
-                                                                <div className="text-slate-400 text-[10px]">{p.customers} customers</div>
+                                                                <div className="text-white font-black text-base">{p.revenue}</div>
+                                                                <div className="text-emerald-400 text-[10px] font-bold">{p.users} users</div>
+                                                                <div className="text-slate-500 text-[10px]">burn {p.burn}</div>
                                                             </div>
                                                         ))}
                                                     </div>
+                                                    {deepIntel.fin.fundraising?.use_of_funds && (
+                                                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Use of Funds</div>
+                                                            <div className="text-emerald-300 text-xs">{deepIntel.fin.fundraising.use_of_funds}</div>
+                                                        </div>
+                                                    )}
                                                     <p className="text-slate-400 text-xs italic">{deepIntel.fin.verdict}</p>
                                                 </div>
                                             )}
                                             {key === 'gtm' && deepIntel.gtm && !deepIntel.gtm.error && (
                                                 <div className="space-y-4">
-                                                    <div className="p-4 bg-violet-500/10 border border-violet-500/20 rounded-xl">
-                                                        <div className="text-[10px] text-violet-400 font-black uppercase mb-1">North Star Metric</div>
-                                                        <div className="text-white font-bold">{deepIntel.gtm.north_star_metric}</div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="p-4 bg-violet-500/10 border border-violet-500/20 rounded-xl">
+                                                            <div className="text-[10px] text-violet-400 font-black uppercase mb-1">North Star Metric</div>
+                                                            <div className="text-white font-bold text-sm">{deepIntel.gtm.north_star_metric}</div>
+                                                        </div>
+                                                        {deepIntel.gtm.icp && (
+                                                            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                                                                <div className="text-[10px] text-blue-400 font-black uppercase mb-1">Ideal Customer Profile</div>
+                                                                <div className="text-white font-bold text-sm">{deepIntel.gtm.icp}</div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="space-y-2">
                                                         {(deepIntel.gtm.channels || []).map((c: any, i: number) => (
                                                             <div key={i} className="flex items-start gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
-                                                                <span className="text-violet-400 font-black text-xs w-6 shrink-0">{i + 1}</span>
-                                                                <div>
-                                                                    <div className="text-white font-bold text-xs">{c.channel} <span className="text-slate-500">· {c.cost} cost · {c.timeline}</span></div>
-                                                                    <div className="text-slate-400 text-[11px] mt-0.5">{c.rationale}</div>
+                                                                <span className="text-violet-400 font-black text-xs w-6 shrink-0 mt-0.5">{i + 1}</span>
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="text-white font-bold text-xs">{c.name}</span>
+                                                                        <span className="text-slate-500 text-[10px]">· CAC {c.cac}</span>
+                                                                        <span className="text-slate-500 text-[10px]">· {c.timeline}</span>
+                                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded ${c.priority === 'High' ? 'bg-violet-500/20 text-violet-400' : 'bg-slate-700 text-slate-400'}`}>{c.priority}</span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                                                        <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Growth Lever</div>
-                                                        <div className="text-violet-300 text-xs">{deepIntel.gtm.growth_lever}</div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Growth Lever</div>
+                                                            <div className="text-violet-300 text-xs">{deepIntel.gtm.growth_lever}</div>
+                                                        </div>
+                                                        {deepIntel.gtm.first_100_customers && (
+                                                            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                                <div className="text-[10px] text-slate-500 font-black uppercase mb-1">First 100 Customers</div>
+                                                                <div className="text-emerald-300 text-xs">{deepIntel.gtm.first_100_customers}</div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -966,6 +1036,184 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                                         <div className="text-[10px] text-red-400 font-black uppercase mb-1">Kill Condition</div>
                                                         <div className="text-red-300 text-xs">{deepIntel.risk.kill_condition}</div>
                                                     </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* ── EXTENDED INTELLIGENCE ── */}
+                    {(extIntel || extIntelLoading) && (
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <Users className="w-6 h-6 text-pink-400" />
+                                <h2 className="text-2xl font-black text-white">Extended Intelligence</h2>
+                                {extIntelLoading && <Loader2 className="w-4 h-4 text-pink-400 animate-spin" />}
+                            </div>
+                            {[
+                                { key: 'personas', label: 'User Personas', color: 'pink', icon: Users },
+                                { key: 'redFlags', label: 'Red Flags', color: 'rose', icon: AlertTriangle },
+                                { key: 'pricing', label: 'Pricing Strategy', color: 'emerald', icon: DollarSign },
+                                { key: 'funding', label: 'Funding Readiness', color: 'blue', icon: TrendingUp },
+                                { key: 'legalRisks', label: 'Legal & Compliance', color: 'yellow', icon: Shield },
+                                { key: 'traction', label: 'Traction Signals', color: 'green', icon: Zap },
+                                { key: 'moat', label: 'Moat Analysis', color: 'purple', icon: Lock },
+                                { key: 'exit', label: 'Exit Scenarios', color: 'cyan', icon: Target },
+                            ].map(({ key, label, color, icon: Icon }) => (
+                                <div key={key} className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
+                                    <button
+                                        onClick={() => setExtIntelOpen(extIntelOpen === key ? null : key)}
+                                        className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Icon className={`w-5 h-5 text-${color}-400`} />
+                                            <span className="font-black text-white text-sm uppercase tracking-widest">{label}</span>
+                                            {!extIntel?.[key as keyof typeof extIntel] && extIntelLoading && (
+                                                <span className="text-[10px] text-slate-500 font-bold">LOADING...</span>
+                                            )}
+                                        </div>
+                                        <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${extIntelOpen === key ? 'rotate-90' : ''}`} />
+                                    </button>
+                                    {extIntelOpen === key && extIntel?.[key as keyof typeof extIntel] && (
+                                        <div className="px-5 pb-6 border-t border-slate-800 pt-4">
+                                            {key === 'personas' && extIntel.personas && !extIntel.personas.error && (
+                                                <div className="space-y-3">
+                                                    {(extIntel.personas.personas || []).map((p: any, i: number) => (
+                                                        <div key={i} className="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <span className="text-white font-black text-xs">{p.name}</span>
+                                                                <span className="text-pink-400 text-[10px] font-bold">{p.role}</span>
+                                                            </div>
+                                                            <p className="text-slate-400 text-[11px] mb-1"><span className="text-slate-500 font-bold">Pain:</span> {p.pain_point}</p>
+                                                            <p className="text-slate-400 text-[11px] mb-1"><span className="text-slate-500 font-bold">Goal:</span> {p.goal}</p>
+                                                            <div className="flex gap-4 mt-2">
+                                                                <span className="text-emerald-400 text-[10px] font-bold">WTP: {p.willingness_to_pay}</span>
+                                                                <span className="text-pink-400 text-[10px]">via {p.acquisition_channel}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {key === 'redFlags' && extIntel.redFlags && !extIntel.redFlags.error && (
+                                                <div className="space-y-3">
+                                                    {(extIntel.redFlags.red_flags || []).map((r: any, i: number) => (
+                                                        <div key={i} className="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className="text-white font-bold text-xs">{r.flag}</span>
+                                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded ${r.severity === 'Critical' ? 'bg-red-500/20 text-red-400' : r.severity === 'High' ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-700 text-slate-400'}`}>{r.severity}</span>
+                                                            </div>
+                                                            <p className="text-slate-400 text-[11px] mb-2">{r.explanation}</p>
+                                                            <p className="text-emerald-400 text-[11px]">Fix: {r.fix}</p>
+                                                        </div>
+                                                    ))}
+                                                    {extIntel.redFlags.verdict && (
+                                                        <p className="text-slate-400 text-xs italic pt-1">{extIntel.redFlags.verdict}</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {key === 'pricing' && extIntel.pricing && !extIntel.pricing.error && (
+                                                <div className="space-y-3">
+                                                    <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                                                        <p className="text-white font-bold text-xs mb-2">Model: {extIntel.pricing.recommended_model}</p>
+                                                        {(extIntel.pricing.price_points || []).map((t: any, i: number) => (
+                                                            <div key={i} className="flex items-center justify-between py-1 border-b border-slate-800 last:border-0">
+                                                                <span className="text-slate-300 text-[11px] font-bold">{t.tier}</span>
+                                                                <span className="text-emerald-400 text-[11px] font-black">{t.price}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {extIntel.pricing.competitive_comparison && <p className="text-slate-400 text-[11px]">{extIntel.pricing.competitive_comparison}</p>}
+                                                    {extIntel.pricing.ltv_estimate && <p className="text-slate-500 text-[10px]">LTV: {extIntel.pricing.ltv_estimate}</p>}
+                                                </div>
+                                            )}
+                                            {key === 'funding' && extIntel.funding && !extIntel.funding.error && (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-4 mb-2">
+                                                        <span className="text-blue-400 font-black text-2xl">{extIntel.funding.readiness_score}/10</span>
+                                                        <span className="text-slate-400 text-xs">{extIntel.funding.recommended_round}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Strengths</p>
+                                                            {(extIntel.funding.strengths || []).map((s: string, i: number) => <p key={i} className="text-emerald-400 text-[11px]">+ {s}</p>)}
+                                                        </div>
+                                                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Gaps</p>
+                                                            {(extIntel.funding.gaps || []).map((g: string, i: number) => <p key={i} className="text-red-400 text-[11px]">- {g}</p>)}
+                                                        </div>
+                                                    </div>
+                                                    {extIntel.funding.timeline && <p className="text-slate-500 text-[10px]">Timeline: {extIntel.funding.timeline}</p>}
+                                                </div>
+                                            )}
+                                            {key === 'legalRisks' && extIntel.legalRisks && !extIntel.legalRisks.error && (
+                                                <div className="space-y-3">
+                                                    {(extIntel.legalRisks.risks || []).map((r: any, i: number) => (
+                                                        <div key={i} className="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className="text-white font-bold text-xs">{r.area}</span>
+                                                                <span className="text-yellow-400 text-[9px] font-bold">{r.urgency}</span>
+                                                            </div>
+                                                            <p className="text-slate-400 text-[11px]">{r.requirement}</p>
+                                                            {r.cost_estimate && <p className="text-slate-500 text-[10px] mt-1">Cost: {r.cost_estimate}</p>}
+                                                        </div>
+                                                    ))}
+                                                    {extIntel.legalRisks.biggest_legal_threat && <p className="text-red-400 text-[11px] italic">Biggest Threat: {extIntel.legalRisks.biggest_legal_threat}</p>}
+                                                </div>
+                                            )}
+                                            {key === 'traction' && extIntel.traction && !extIntel.traction.error && (
+                                                <div className="space-y-3">
+                                                    {(extIntel.traction.validation_methods || []).map((v: any, i: number) => (
+                                                        <div key={i} className="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <span className="text-white font-bold text-xs">{v.method}</span>
+                                                            <div className="flex gap-4 mt-1">
+                                                                <span className="text-slate-500 text-[10px]">{v.timeline}</span>
+                                                                <span className="text-slate-500 text-[10px]">{v.cost}</span>
+                                                            </div>
+                                                            <p className="text-emerald-400 text-[11px] mt-1">Signal: {v.success_signal}</p>
+                                                        </div>
+                                                    ))}
+                                                    {extIntel.traction.pre_launch_strategy && <p className="text-slate-400 text-[11px]">Pre-launch: {extIntel.traction.pre_launch_strategy}</p>}
+                                                </div>
+                                            )}
+                                            {key === 'moat' && extIntel.moat && !extIntel.moat.error && (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-4 mb-2">
+                                                        <span className="text-purple-400 font-black text-lg">{extIntel.moat.moat_type}</span>
+                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded ${extIntel.moat.durability === 'Strong' ? 'bg-emerald-500/20 text-emerald-400' : extIntel.moat.durability === 'Moderate' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>{extIntel.moat.durability}</span>
+                                                        <span className="text-slate-500 text-[10px]">Score: {extIntel.moat.defensibility_score}/10</span>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Threats</p>
+                                                        {(extIntel.moat.threats || []).map((t: string, i: number) => <p key={i} className="text-red-400 text-[11px]">• {t}</p>)}
+                                                    </div>
+                                                    {extIntel.moat.time_to_moat && <p className="text-slate-500 text-[10px]">Time to moat: {extIntel.moat.time_to_moat}</p>}
+                                                </div>
+                                            )}
+                                            {key === 'exit' && extIntel.exit && !extIntel.exit.error && (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-4 mb-2">
+                                                        <span className="text-cyan-400 font-black text-sm">{extIntel.exit.most_likely_exit}</span>
+                                                        <span className="text-slate-400 text-[10px]">{extIntel.exit.timeline}</span>
+                                                        <span className="text-emerald-400 text-[10px] font-bold">{extIntel.exit.valuation_range}</span>
+                                                    </div>
+                                                    {(extIntel.exit.scenarios || []).map((s: any, i: number) => (
+                                                        <div key={i} className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className="text-white font-bold text-xs">{s.type}</span>
+                                                                <span className="text-cyan-400 text-[10px]">{s.valuation} • {s.probability}</span>
+                                                            </div>
+                                                            <p className="text-slate-400 text-[11px]">{s.reasoning}</p>
+                                                        </div>
+                                                    ))}
+                                                    {(extIntel.exit.likely_acquirers || []).length > 0 && (
+                                                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Likely Acquirers</p>
+                                                            {extIntel.exit.likely_acquirers.map((a: string, i: number) => <p key={i} className="text-slate-300 text-[11px]">• {a}</p>)}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -1018,21 +1266,21 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                 <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl group hover:border-cyan-500/30 transition-colors">
                                     <h3 className="text-cyan-400 font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><Briefcase className="w-4 h-4" /> Market & Finance</h3>
                                     <div className="space-y-4 text-xs md:text-sm">
-                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Funding:</span> <span className="text-white font-medium">{selectedCompetitor.market_fin.funding}</span></div>
-                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Investors:</span> <span className="text-white font-medium">{selectedCompetitor.market_fin.investors}</span></div>
+                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Funding:</span> <span className="text-white font-medium">{selectedCompetitor.market_fin?.funding || '—'}</span></div>
+                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Investors:</span> <span className="text-white font-medium">{selectedCompetitor.market_fin?.investors || '—'}</span></div>
                                     </div>
                                 </div>
                                 <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl group hover:border-emerald-500/30 transition-colors">
                                     <h3 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><Rocket className="w-4 h-4" /> Product Intel</h3>
                                     <div className="space-y-4 text-xs md:text-sm">
-                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Pricing:</span> <span className="text-white font-medium">{selectedCompetitor.product_intel.pricing}</span></div>
-                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Features:</span> <span className="text-white font-medium">{selectedCompetitor.product_intel.features}</span></div>
+                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Pricing:</span> <span className="text-white font-medium">{selectedCompetitor.product_intel?.pricing || '—'}</span></div>
+                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Features:</span> <span className="text-white font-medium">{selectedCompetitor.product_intel?.features || '—'}</span></div>
                                     </div>
                                 </div>
                                 <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl group hover:border-blue-500/30 transition-colors">
                                     <h3 className="text-blue-400 font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><Hammer className="w-4 h-4" /> Tech Stack</h3>
                                     <div className="space-y-4 text-xs md:text-sm">
-                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Stack:</span> <span className="text-white font-mono text-[11px]">{selectedCompetitor.technical_infra.stack}</span></div>
+                                        <div><span className="text-slate-500 block mb-1 uppercase text-[10px] font-bold">Stack:</span> <span className="text-white font-mono text-[11px]">{selectedCompetitor.technical_infra?.stack || '—'}</span></div>
                                     </div>
                                 </div>
                             </div>

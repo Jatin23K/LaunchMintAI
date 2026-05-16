@@ -1,30 +1,47 @@
-from app.services.llm_engine import llm
-import json
+from app.services.llm_engine import llm, call_gemini, _next_gemini_offset
+from app.extensions.parse_helper import safe_parse_json
+
+_ECHO_MARKERS = ["e.g.", "D2C brands may resist", "Policy changes can break"]
 
 class Extension:
     def execute(self, payload):
-        prompt = f"""
-        You are a Risk Management Officer. Analyze potential failure points.
-        Return STRICT JSON.
+        idea = payload.get('idea', str(payload))
 
-        IDEA: {payload}
+        prompt = f"""You are a regulatory and structural risk analyst for startups.
 
-        REQUIRED JSON STRUCTURE:
-        {{
-            "marketRisks": [{{ "risk": "Low acceptance", "mitigation": "Pilot", "mitigationPlan": "Run 3-month pilot with 20 users..." }}],
-            "operationalRisks": [{{ "risk": "Server outage", "mitigation": "Redundancy", "mitigationPlan": "Use AWS multi-region..." }}],
-            "financialRisks": [{{ "risk": "High burn rate", "mitigation": "Bootstrap", "mitigationPlan": "Limit hiring to 2 founders..." }}],
-            "confidenceScore": "High",
-            "confidenceReason": "Standard pattern"
-        }}
-        
-    LOGIC RULES:
-    1.  **THE W-2 MOAT**: If competitors are Gig (Uber-for-X), your ONLY differentiation is 'Professionalism/Safety'.
-    2.  **PREMIUM PRICING**: You must position as the 'Mercedes' option. "We cost 20% more because our walkers are Employees, not Gig workers."
-    3.  **TRUST > COST**: Do not try to be cheaper. Try to be safer.
-        """
+IDEA: {idea}
+
+Focus ONLY on these risk categories (do NOT overlap with general business/operational risks):
+1. REGULATORY: Government regulations, licensing requirements, industry-specific compliance
+2. LEGAL: IP risks, patent conflicts, liability exposure, terms of service violations
+3. MARKET STRUCTURAL: Market concentration, platform dependency, winner-take-all dynamics
+4. COMPLIANCE: Data privacy (GDPR/CCPA), industry certifications (SOC2/HIPAA), audit requirements
+
+Do NOT include generic risks like "competition" or "market adoption" — those are covered elsewhere.
+
+Return ONLY valid JSON:
+{{
+  "overall_risk": "<Low/Medium/High/Critical>",
+  "risks": [
+    {{
+      "title": "<specific regulatory/legal/structural risk>",
+      "category": "<regulatory/legal/market_structural/compliance>",
+      "severity": "<Low/Medium/High>",
+      "description": "<specific description for {idea}>",
+      "mitigation": "<actionable mitigation step>"
+    }}
+  ],
+  "kill_condition": "<the single regulatory or legal scenario that would kill this startup>"
+}}
+
+Return exactly 3-4 risks."""
+
         result_json = llm.analyze(prompt)
-        try:
-            return json.loads(result_json)
-        except:
-            return {"error": "JSON Parse Error", "raw": result_json}
+        data = safe_parse_json(result_json)
+
+        if data and any(marker in str(data) for marker in _ECHO_MARKERS):
+            print(f"[RISK] Echo detected — retrying with Gemini")
+            result_json = call_gemini(prompt, key_offset=_next_gemini_offset())
+            data = safe_parse_json(result_json)
+
+        return data if data else {"error": "Risk scan unavailable", "raw": result_json[:200] if result_json else ""}

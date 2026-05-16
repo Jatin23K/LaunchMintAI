@@ -75,6 +75,28 @@ NIM_MODEL_FAST = "meta/llama-3.1-8b-instruct"    # faster, for simple extraction
 print(f"[INIT] Gemini keys loaded: {len(_KEY_POOL)}/6")
 print(f"[INIT] NIM keys loaded:    {len(_NIM_KEY_POOL)}/6")
 
+# ── TRUE ROUND-ROBIN COUNTERS ─────────────────────────────────────────────────
+# Each call auto-increments so every key gets even usage across all endpoints.
+# No more hardcoded key_offset=N — every call picks the next key in line.
+_GEMINI_CALL_CTR = 0
+_NIM_CALL_CTR    = 0
+
+def _next_gemini_offset() -> int:
+    global _GEMINI_CALL_CTR
+    if not _KEY_POOL:
+        return 0
+    offset = _GEMINI_CALL_CTR % len(_KEY_POOL)
+    _GEMINI_CALL_CTR += 1
+    return offset
+
+def _next_nim_offset() -> int:
+    global _NIM_CALL_CTR
+    if not _NIM_KEY_POOL:
+        return 0
+    offset = _NIM_CALL_CTR % len(_NIM_KEY_POOL)
+    _NIM_CALL_CTR += 1
+    return offset
+
 app = FastAPI()
 
 app.add_middleware(
@@ -275,6 +297,43 @@ GIANT_INTEL = {
         "marketing": {"acquisition": "Entrepreneur community, SEO", "seo_keywords": "Start online store, eCommerce", "social_status": "Go-to brand"},
         "kill_strategy": "Attack their 0.5-2% transaction fees by launching a zero-fee eCommerce platform with built-in AI merchandising, targeting Shopify merchants doing $500K+ GMV."
     },
+    # ── HR / Onboarding ────────────────────────────────────────────────────────
+    "bamboohr": {
+        "url": "https://www.bamboohr.com",
+        "market_fin": {"funding": "$233M Raised", "investors": "Sorenson Capital, ICONIQ", "management": "Brad Rencher (CEO)"},
+        "product_intel": {"pricing": "$6-$9/employee/mo", "features": "HRIS, Onboarding, Time Tracking, ATS", "swot": "W: Limited enterprise features, basic analytics"},
+        "technical_infra": {"stack": "PHP/React/AWS", "velocity": "Monthly", "platform": "Cloud SaaS"},
+        "sentiment": {"complaints": "Limited reporting, no payroll in all regions", "trust_score": "4.3/5", "churn_drivers": "Outgrowing SMB features"},
+        "marketing": {"acquisition": "PLG, G2/Capterra reviews", "seo_keywords": "HR software, HRIS, Employee onboarding", "social_status": "SMB leader"},
+        "kill_strategy": "Attack their static onboarding checklists by launching an AI-adaptive onboarding platform that personalizes training paths based on role, skill gaps, and learning speed."
+    },
+    "rippling": {
+        "url": "https://www.rippling.com",
+        "market_fin": {"funding": "$1.2B+ Raised", "investors": "Founders Fund, Greenoaks, Coatue", "management": "Parker Conrad (CEO)"},
+        "product_intel": {"pricing": "$8-$35/employee/mo", "features": "HR, IT, Finance unified platform", "swot": "W: Complex pricing, steep learning curve"},
+        "technical_infra": {"stack": "Python/React/AWS", "velocity": "Bi-weekly", "platform": "Cloud SaaS"},
+        "sentiment": {"complaints": "Expensive at scale, complex setup", "trust_score": "4.1/5", "churn_drivers": "Implementation complexity"},
+        "marketing": {"acquisition": "Enterprise sales, content marketing", "seo_keywords": "HR platform, Employee management", "social_status": "Fast-growing"},
+        "kill_strategy": "Outflank their all-in-one complexity by building a laser-focused onboarding tool that integrates with existing HR stacks — 10-minute setup vs. Rippling's weeks."
+    },
+    "workday": {
+        "url": "https://www.workday.com",
+        "market_fin": {"funding": "Public (WDAY)", "investors": "Institutional, Public", "management": "Carl Eschenbach (CEO)"},
+        "product_intel": {"pricing": "$100+/user/yr enterprise", "features": "HCM, Financials, Planning", "swot": "W: Extremely expensive, long implementation"},
+        "technical_infra": {"stack": "Java/Proprietary/Multi-cloud", "velocity": "Bi-annual releases", "platform": "Enterprise Cloud"},
+        "sentiment": {"complaints": "High cost, 6-12 month implementation", "trust_score": "3.8/5", "churn_drivers": "TCO and rigidity"},
+        "marketing": {"acquisition": "Enterprise sales team", "seo_keywords": "Enterprise HCM, Workforce management", "social_status": "Enterprise dominant"},
+        "kill_strategy": "Disrupt their 6-month implementation cycles by offering an AI-powered onboarding module that deploys in days and costs 90% less per employee."
+    },
+    "factorial": {
+        "url": "https://www.factorialhr.com",
+        "market_fin": {"funding": "$120M+ Raised", "investors": "Tiger Global, CRV", "management": "Jordi Romero (CEO)"},
+        "product_intel": {"pricing": "$4-$8/employee/mo", "features": "HR, Time off, Onboarding, Payroll (EU)", "swot": "W: EU-focused, limited US presence"},
+        "technical_infra": {"stack": "Ruby/React/AWS", "velocity": "Bi-weekly", "platform": "Cloud SaaS"},
+        "sentiment": {"complaints": "Limited integrations, US payroll gaps", "trust_score": "4.2/5", "churn_drivers": "Missing features for US market"},
+        "marketing": {"acquisition": "PLG, SMB-focused content", "seo_keywords": "HR software Europe, People management", "social_status": "Growing EU"},
+        "kill_strategy": "Attack their EU-only strength by building a global-first onboarding platform with multi-currency payroll and localized compliance from day one."
+    },
     # ── Food / Delivery ───────────────────────────────────────────────────────
     "doordash": {
         "url": "https://www.doordash.com",
@@ -407,66 +466,77 @@ def professionalize_source(raw_name):
 #  DUAL-LAYER SEARCH ENGINE
 # ============================================================================
 
-def execute_search(query, num_results):
-    """Helper to run a single search attempt using Tavily"""
+def _serper_search_sync(query: str, num_results: int = 10) -> list:
+    """Synchronous Serper search used by the legacy search_web helper."""
+    import os, requests as _req
+    keys = [
+        os.getenv("SERPER_API_KEY"),
+        os.getenv("SERPER_API_KEY_1"),
+        os.getenv("SERPER_API_KEY_2"),
+        os.getenv("SERPER_API_KEY_3"),
+        os.getenv("SERPER_API_KEY_4"),
+        os.getenv("SERPER_API_KEY_5"),
+        os.getenv("SERPER_API_KEY_6"),
+    ]
+    key = next((k for k in keys if k), None)
+    if not key:
+        return []
     try:
-        from services.market_search import get_tavily_client
-        client = get_tavily_client()
-        if not client:
-            return []
-            
-        res = client.search(query=query, search_depth="basic", max_results=num_results)
-        results = res.get('results', [])
-        
+        resp = _req.post(
+            "https://google.serper.dev/search",
+            headers={"X-API-KEY": key, "Content-Type": "application/json"},
+            json={"q": query, "num": num_results},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        items = data.get("organic", []) + data.get("news", [])
+        return [{"title": r.get("title",""), "url": r.get("link",""), "content": r.get("snippet","")} for r in items]
+    except Exception as e:
+        print(f"[SERPER] Error: {e}")
+        return []
+
+
+def execute_search(query, num_results):
+    """Single search attempt using Serper (Google)."""
+    try:
+        from services.market_search import is_valid_market_source, is_outdated_source
+        results = _serper_search_sync(query, num_results)
         clean = []
         for r in results:
-            if is_valid_source(r['url']) and not is_outdated_source(r['title'], r['content']):
-                clean.append({
-                    'title': r['title'],
-                    'href': r['url'],
-                    'body': r['content']
-                })
+            if is_valid_market_source(r['url'], r['title']) and not is_outdated_source(r['title'], r['content']):
+                clean.append({'title': r['title'], 'href': r['url'], 'body': r['content']})
         return clean
     except Exception as e:
         print(f" Search Query Failed: {query} - {e}")
         return []
 
+
 def search_web(idea, mode="financial"):
     try:
-        from services.market_search import get_tavily_client, is_valid_market_source, is_outdated_source
-        client = get_tavily_client()
-        if not client:
-            return "No verified market data found.", "", "Data Unavailable"
+        from services.market_search import is_valid_market_source, is_outdated_source
 
         if mode == "financial":
-            query = f"{idea} market size report 2025"
-            print(f" [SEARCH ROUTER] Routing to Tavily Market Search for: {idea}")
-            res = client.search(query=query, search_depth="advanced", max_results=5)
-            results = res.get('results', [])
-            
-            fresh_results = [
-                r for r in results 
-                if not is_outdated_source(r.get('title', ''), r.get('content', '')) 
-                and is_valid_market_source(r.get('url', ''), r.get('title', ''))
+            query = f"{idea} market size revenue forecast 2025 2030"
+            print(f" [SEARCH ROUTER] Serper market search for: {idea}")
+            results = _serper_search_sync(query, 8)
+            fresh = [
+                r for r in results
+                if not is_outdated_source(r.get('title',''), r.get('content',''))
+                and is_valid_market_source(r.get('url',''), r.get('title',''))
             ]
-            
-            if not fresh_results:
+            if not fresh:
                 return "All found sources were filtered/outdated. Data unavailable.", "", "Data Unavailable"
-                
-            context_parts = []
-            for i, r in enumerate(fresh_results[:5], 1):
-                context_parts.append(f"[SOURCE {i}]\nTitle: {r.get('title')}\nURL: {r.get('url')}\nContent: {r.get('content')}\n---")
-            context = "\n\n".join(context_parts)
-            return context, fresh_results[0].get('url', ''), fresh_results[0].get('title', 'Market Source')
-            
+            parts = []
+            for i, r in enumerate(fresh[:5], 1):
+                parts.append(f"[SOURCE {i}]\nTitle: {r.get('title')}\nURL: {r.get('url')}\nContent: {r.get('content')}\n---")
+            return "\n\n".join(parts), fresh[0].get('url',''), fresh[0].get('title','Market Source')
         else:
-            query_c = f"top competitors and alternatives for {idea}"
-            print(f" Search Competitors (Tavily): {query_c}...")
-            res = client.search(query=query_c, search_depth="basic", max_results=5)
-            results = res.get('results', [])
-            
-            if not results: return "No competitor data found.", "", "Analysis"
-            
+            query_c = f"top competitors and alternatives for {idea} 2025"
+            print(f" [SEARCH ROUTER] Serper competitor search for: {idea}")
+            results = _serper_search_sync(query_c, 5)
+            if not results:
+                return "No competitor data found.", "", "Analysis"
             context = "\n".join([f"Title: {r['title']}\nSnippet: {r['content']}\nSource: {r['url']}\n" for r in results[:5]])
             return context, "", "Competitor Analysis"
 
@@ -506,7 +576,8 @@ def _honest_fallback(idea, mkt_url="#", mkt_src=""):
         "dept_product": [],
         "dept_marketing": [],
         "dept_finance": [],
-        "strategy_log": {"legal": [], "product": [], "marketing": [], "finance": []}
+        "strategy_log": {"legal": [], "product": [], "marketing": [], "finance": []},
+        "citations": [{"title": mkt_src or "Market Intelligence Report", "url": mkt_url}] if mkt_url and mkt_url != "#" else []
     }
 
 
@@ -760,7 +831,7 @@ def audit_search_results(results_list, query):
     
     try:
         # NIM FAST: audit is simple list filtering — 8B is more than sufficient
-        raw_verdict = call_nim(prompt, model=NIM_MODEL_FAST, key_offset=2)
+        raw_verdict = call_nim(prompt, model=NIM_MODEL_FAST, key_offset=_next_nim_offset())
         valid_indices = clean_json(raw_verdict)
         
         if isinstance(valid_indices, list):
@@ -865,7 +936,7 @@ def classify_industry(idea: str) -> dict:
     Input: "{idea}"
     """
     # NIM FAST: classify is low-complexity — 8B model is sufficient, 372ms
-    raw = call_nim(prompt, model=NIM_MODEL_FAST, key_offset=0)
+    raw = call_nim(prompt, model=NIM_MODEL_FAST, key_offset=_next_nim_offset())
     data = clean_json(raw)
     if data: return data
     
@@ -946,6 +1017,41 @@ def _apply_audit(search_data, audited_objects):
     return search_data
 
 
+def _tam_sanity_check(market: dict, source_objects: list):
+    """If LLM's TAM is >5x the largest number found in search sources, cap it."""
+    if not source_objects or not market:
+        return
+    all_text = " ".join(s.get("snippet", s.get("content", "")) for s in source_objects).upper().replace(",", "")
+    source_billions = []
+    for curr, val, unit in re.findall(r"(\$|USD\s?)?\s?(\d+(?:\.\d+)?)\s?(BILLION|BN|B|MILLION|MN|M)", all_text):
+        try:
+            f = float(val)
+            if unit.upper() in ("MILLION", "MN", "M"):
+                f /= 1000
+            if 0.01 < f < 500:
+                source_billions.append(f)
+        except:
+            pass
+    if not source_billions:
+        return
+    max_source = max(source_billions)
+    for field in ("current_tam", "forecast_tam"):
+        val = market.get(field, "")
+        digits = re.sub(r"[^\d\.]", "", str(val))
+        if not digits:
+            continue
+        try:
+            llm_val = float(digits)
+            if llm_val > max_source * 5:
+                capped = f"~${max_source:.1f}B"
+                print(f"[SANITY] {field}={val} exceeds 5x source max ${max_source}B → capping to {capped}")
+                market[field] = capped
+                if market.get("confidence", "").lower() == "high":
+                    market["confidence"] = "Medium"
+        except:
+            pass
+
+
 @app.post("/analyze")
 async def analyze(req: IdeaRequest):
     idea = req.idea
@@ -976,7 +1082,7 @@ async def analyze(req: IdeaRequest):
     try:
         search_data, comp_names_raw = await asyncio.gather(
             search_market_data(idea, search_query),                                      # Tavily async
-            asyncio.to_thread(call_nim, extract_prompt, NIM_MODEL_FAST, 1),             # NIM FAST: simple list extraction
+            asyncio.to_thread(call_nim, extract_prompt, NIM_MODEL_FAST, _next_nim_offset()),  # NIM FAST: simple list extraction
         )
     except Exception as _b2_err:
         print(f"[BATCH2] Partial failure: {_b2_err} — using fallback search data")
@@ -1060,7 +1166,9 @@ async def analyze(req: IdeaRequest):
     Task: Analyze the provided "Market Data" and "Competitor Intel" for: "{idea}".
     
      ANTI-HALLUCINATION & CONTEXT ALIGNMENT:
-    1. INDUSTRY MATCH: Verify that the numbers you use are for the EXACT industry (e.g. if the idea is "Dog Walking", DO NOT use "Pet Insurance" or "Total Pet Care" numbers).
+    1. SUB-MARKET MATCH (CRITICAL): Use figures for the EXACT sub-market, NOT the parent industry.
+       Example: "Employee Onboarding Software" (~$1.4B) is NOT "HR Tech" (~$40B) or "HCM" (~$30B).
+       If search data shows a specific sub-market figure, use THAT number — do NOT inflate to parent industry.
     2. SOURCE VERIFICATION: Prefer numbers from market research reports (Statista, Grand View, Mordor, etc.). Blog estimates are acceptable if no better source exists.
 
     ══════════════════════════════════════════════════════
@@ -1098,7 +1206,9 @@ async def analyze(req: IdeaRequest):
        - Prefer numbers from the DATA SOURCES. If not found there, use your training knowledge.
        - FORMAT: strictly "$XX.XB" or "$XXB". Do NOT return "NOT_FOUND" for well-known industries.
     2. GROWTH (CAGR): Extract CAGR from DATA SOURCES. If not there, estimate from your knowledge.
-    3. COMPETITORS: Analyze up to 3 competitors. Only include fields you have evidence for.
+    3. COMPETITORS: Analyze up to 3 competitors. Each must have UNIQUE data — no duplicate descriptions.
+       - Include: funding amount, employee count estimate, key differentiator, primary weakness.
+       - CONSISTENCY: Use the SAME competitor names across ALL sections (market_intel, competitive_landscape, risk analysis). Do not introduce competitors in one section that don't appear in others.
     4. ACTION PLAN (DEPARTMENTAL PRIORITIES):
        - NO "Startup 101" Admin: Never suggest "Register LLC," "Open Bank Account," "Buy Domain."
        - NO Vendor Shilling: Use functional terms, not brand names like "AWS" or "Jira."
@@ -1166,7 +1276,7 @@ async def analyze(req: IdeaRequest):
         # Debug: Print which prompt parts are being sent
         # print(f"[DEBUG] Sending {len(ANALYZE_PROMPT + CRITICAL_RULES)} chars to Gemini...")
         
-        raw = call_gemini(ANALYZE_PROMPT + CRITICAL_RULES, key_offset=3)
+        raw = call_gemini(ANALYZE_PROMPT + CRITICAL_RULES, key_offset=_next_gemini_offset())
         
         # print(f"[DEBUG] Raw AI Response: {raw[:500]}...") # Log first 500 chars
         
@@ -1195,8 +1305,10 @@ async def analyze(req: IdeaRequest):
                 comp["marketing"] = giant.get("marketing", comp.get("marketing", {}))
                 comp["kill_strategy"] = giant.get("kill_strategy", comp.get("kill_strategy", NOT_FOUND))
 
+        # TAM sanity check: if LLM inflated to parent industry, cap it
+        _tam_sanity_check(data.get("market", {}), search_data.get("source_objects", []))
+
         # Math fallback: calculate current_tam from forecast + CAGR if missing
-        # (this is deterministic math, not hallucination)
         data["market"] = calculate_missing_tam(data["market"])
 
         # Layer 3: light sanity check — do NOT wipe valid LLM values
@@ -1212,6 +1324,15 @@ async def analyze(req: IdeaRequest):
         data["market"] = market
 
         data["idea"] = idea
+
+        # Inject citations so frontend Research Grounding section always has sources
+        raw_sources = search_data.get("source_objects", [])
+        data["citations"] = [
+            {"title": s.get("title", "Market Research Source"), "url": s.get("url", "")}
+            for s in raw_sources
+            if s.get("url") and s.get("url") != "#"
+        ][:8]  # cap at 8 citations
+
         return data
 
     except Exception as e:
@@ -1282,7 +1403,7 @@ async def war_room(request: IdeaRequest):
     
     try:
         # NIM ROAST: 17B handles war-room analysis — async so it doesn't block thread pool
-        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, 2)
+        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, _next_nim_offset())
         data = clean_json(raw)
         if not data: raise ValueError("Spy sat downlink failed.")
         print(f"[WAR] Complete for: {idea}")
@@ -1356,7 +1477,7 @@ async def vc_roast(request: VCRoastRequest):
     full_prompt = f"{VC_ROAST_PROMPT}{grounding}\nTARGET IDEA: {user_idea}"
 
     try:
-        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, 3)
+        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, _next_nim_offset())
         data = clean_json(raw)
         if not data: raise ValueError("Roast failed.")
         return data
@@ -1430,7 +1551,7 @@ USE these numbers in the elevator_pitch and value_proposition where natural.
     full_prompt = f"{PITCH_FORGE_PROMPT}{market_ctx}\nTARGET IDEA: {user_idea}"
     
     try:
-        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_FORGE, 4)
+        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_FORGE, _next_nim_offset())
         data = clean_json(raw)
         if not data: raise ValueError("Pitch Forge failed.")
         return data
@@ -1487,7 +1608,7 @@ Return ONLY valid JSON:
 }}
 """
     try:
-        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_HEAVY, 0)
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_HEAVY, _next_nim_offset())
         data = clean_json(raw)
         if not data: raise ValueError("Compare failed")
         return data
@@ -1543,7 +1664,7 @@ Return ONLY valid JSON.
 """
     try:
         # NIM EXT: nemotron-nano-8b handles structured financial templates well
-        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, 0)
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, _next_nim_offset())
         data = clean_json(raw)
         if not data: raise ValueError("Parse failed")
         return data
@@ -1583,7 +1704,7 @@ Return ONLY valid JSON.
 """
     try:
         # NIM EXT: GTM strategy is medium complexity
-        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, 1)
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, _next_nim_offset())
         data = clean_json(raw)
         if not data: raise ValueError("Parse failed")
         return data
@@ -1620,7 +1741,7 @@ Return ONLY valid JSON.
 """
     try:
         # NIM EXT: risk assessment is structured JSON
-        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, 2)
+        raw = await asyncio.to_thread(call_nim, prompt, NIM_MODEL_EXT, _next_nim_offset())
         data = clean_json(raw)
         if not data: raise ValueError("Parse failed")
         return data
@@ -1633,9 +1754,13 @@ Return ONLY valid JSON.
 # ============================================================================
 class LLMWrapper:
     def analyze(self, prompt: str) -> str:
-        """Compatibility layer for Extensions relying on llm.analyze()"""
-        print(f" Legacy Extension Call: {prompt[:50]}...")
-        return call_gemini(prompt)
+        """Extensions call llm.analyze() — NIM first, Gemini fallback."""
+        print(f" Extension Call: {prompt[:50]}...")
+        if _NIM_KEY_POOL:
+            result = call_nim(prompt, NIM_MODEL_EXT, _next_nim_offset())
+            if result and result.strip() != "{}":
+                return result
+        return call_gemini(prompt, key_offset=_next_gemini_offset())
 
 llm = LLMWrapper()
 

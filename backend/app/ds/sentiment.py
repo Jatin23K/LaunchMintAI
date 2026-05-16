@@ -99,6 +99,37 @@ COMPETITOR_KB = {
         "pricing":     "Insurance premiums",
         "kill_strategy": "Focus on one employer vertical with transparent pricing and faster claims via automation"
     },
+    # HR / Onboarding
+    "bamboohr": {
+        "pain_points": ["Limited reporting and analytics", "No built-in payroll in all regions", "Basic onboarding checklists", "Outgrown by mid-market companies"],
+        "strengths":   ["Easy to use", "Great for SMBs", "Strong G2 ratings"],
+        "pricing":     "$6-$9/employee/month",
+        "kill_strategy": "Replace their static onboarding checklists with AI-adaptive learning paths that personalize by role and skill gaps"
+    },
+    "rippling": {
+        "pain_points": ["Expensive for small teams", "Complex implementation takes weeks", "Overwhelming feature set", "Steep learning curve"],
+        "strengths":   ["Unified HR+IT+Finance", "Strong automation", "Fast-growing"],
+        "pricing":     "$8-$35/employee/month",
+        "kill_strategy": "Win with 10-minute onboarding setup vs Rippling's weeks-long implementation — laser focus on onboarding only"
+    },
+    "workday": {
+        "pain_points": ["6-12 month implementation cycles", "Extremely expensive enterprise pricing", "Requires dedicated admin team", "Rigid workflow customization"],
+        "strengths":   ["Enterprise trust", "Complete HCM suite", "Global compliance"],
+        "pricing":     "$100+/user/year (enterprise contracts)",
+        "kill_strategy": "Disrupt their 6-month deployment with a plug-and-play onboarding module at 90% lower cost per employee"
+    },
+    "factorial": {
+        "pain_points": ["Limited US market presence", "Missing integrations with US payroll providers", "Basic analytics", "No AI features"],
+        "strengths":   ["Strong in EU market", "Affordable", "Growing fast"],
+        "pricing":     "$4-$8/employee/month",
+        "kill_strategy": "Beat their EU-only focus with a global-first platform that handles multi-currency payroll and localized compliance"
+    },
+    "gusto": {
+        "pain_points": ["Limited to US only", "No enterprise features", "Basic onboarding flow", "Slow customer support"],
+        "strengths":   ["Great payroll", "Easy UI", "Strong SMB brand"],
+        "pricing":     "$40/month + $6/employee",
+        "kill_strategy": "Target Gusto's gap in onboarding depth — their flow is checkbox-based while yours is AI-personalized"
+    },
     # Logistics
     "flexport": {
         "pain_points": ["Expensive for SMBs", "Complex onboarding", "Visibility gaps"],
