@@ -933,6 +933,19 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                         </div>
                                         <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${deepIntelOpen === key ? 'rotate-90' : ''}`} />
                                     </button>
+                                    {deepIntelOpen === key && !deepIntel?.[key as keyof typeof deepIntel] && deepIntelLoading && (
+                                        <div className="px-5 pb-6 border-t border-slate-800 pt-4 space-y-3">
+                                            {[...Array(3)].map((_, i) => (
+                                                <div key={i} className="animate-pulse">
+                                                    <div className="h-20 bg-slate-800/60 rounded-xl border border-slate-700/30"></div>
+                                                </div>
+                                            ))}
+                                            <div className="animate-pulse flex gap-3">
+                                                <div className="h-4 bg-slate-800/40 rounded w-1/3"></div>
+                                                <div className="h-4 bg-slate-800/40 rounded w-1/4"></div>
+                                            </div>
+                                        </div>
+                                    )}
                                     {deepIntelOpen === key && deepIntel?.[key as keyof typeof deepIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
                                             {key === 'fin' && deepIntel.fin && !deepIntel.fin.error && (
@@ -1077,6 +1090,19 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                         </div>
                                         <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${extIntelOpen === key ? 'rotate-90' : ''}`} />
                                     </button>
+                                    {extIntelOpen === key && !extIntel?.[key as keyof typeof extIntel] && extIntelLoading && (
+                                        <div className="px-5 pb-6 border-t border-slate-800 pt-4 space-y-3">
+                                            {[...Array(3)].map((_, i) => (
+                                                <div key={i} className="animate-pulse">
+                                                    <div className="h-16 bg-slate-800/60 rounded-xl border border-slate-700/30"></div>
+                                                </div>
+                                            ))}
+                                            <div className="animate-pulse flex gap-3">
+                                                <div className="h-4 bg-slate-800/40 rounded w-2/5"></div>
+                                                <div className="h-4 bg-slate-800/40 rounded w-1/4"></div>
+                                            </div>
+                                        </div>
+                                    )}
                                     {extIntelOpen === key && extIntel?.[key as keyof typeof extIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
                                             {key === 'personas' && extIntel.personas && !extIntel.personas.error && (
