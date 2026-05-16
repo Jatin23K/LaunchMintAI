@@ -1275,31 +1275,33 @@ async def analyze(req: IdeaRequest):
     try:
         full_prompt = ANALYZE_PROMPT + CRITICAL_RULES
 
-        # Strategy: NIM 70B first (free, fast), Gemini fallback, then retry Gemini
-        raw = None
-        data = None
+        # Race NIM 70B and Gemini in parallel — first valid result wins
+        print("[ANALYZE] Racing NIM 70B + Gemini in parallel...")
+        nim_off = _next_nim_offset()
+        gem_off = _next_gemini_offset()
 
-        if _NIM_KEY_POOL:
-            print("[ANALYZE] Trying NIM 70B first...")
-            raw = call_nim(full_prompt, NIM_MODEL_HEAVY, _next_nim_offset())
-            data = clean_json(raw) if raw else None
-            if data and data.get("market"):
-                print("[ANALYZE] NIM 70B succeeded")
-            else:
-                data = None
+        async def _try_nim():
+            if not _NIM_KEY_POOL:
+                return None
+            r = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_HEAVY, nim_off)
+            d = clean_json(r) if r else None
+            return d if d and d.get("market") else None
+
+        async def _try_gemini():
+            r = await asyncio.to_thread(call_gemini, full_prompt, key_offset=gem_off)
+            d = clean_json(r) if r else None
+            return d if d and d.get("market") else None
+
+        results = await asyncio.gather(_try_nim(), _try_gemini(), return_exceptions=True)
+        data = None
+        for r in results:
+            if isinstance(r, dict) and r.get("market"):
+                data = r
+                print(f"[ANALYZE] Got valid result from {'NIM' if r is results[0] else 'Gemini'}")
+                break
 
         if not data:
-            print("[ANALYZE] Trying Gemini (attempt 1)...")
-            raw = call_gemini(full_prompt, key_offset=_next_gemini_offset())
-            data = clean_json(raw) if raw else None
-
-        if not data or not data.get("market"):
-            print("[ANALYZE] Trying Gemini (attempt 2 with different key)...")
-            raw = call_gemini(full_prompt, key_offset=_next_gemini_offset())
-            data = clean_json(raw) if raw else None
-
-        if not data or not data.get("market"):
-            print(f"[HONEST] All LLM attempts failed for: {idea}")
+            print(f"[HONEST] Both NIM and Gemini failed for: {idea}")
             return _honest_fallback(idea, mkt_url, mkt_src)
 
         # Fix source fields
