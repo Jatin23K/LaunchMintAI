@@ -1,4 +1,4 @@
-from app.services.llm_engine import llm, call_gemini, _next_gemini_offset
+from app.services.llm_engine import llm, call_gemini_fast
 from app.extensions.parse_helper import safe_parse_json
 
 _ECHO_MARKERS = ["e.g.", "SaaS Subscription $99/mo", "Pre-Seed $500K", "60% product, 30% GTM"]
@@ -47,7 +47,7 @@ Return ONLY valid JSON:
 
         if data and any(marker in str(data) for marker in _ECHO_MARKERS):
             print(f"[FIN-PROJ] Echo detected — retrying with Gemini")
-            result_json = call_gemini(prompt, key_offset=_next_gemini_offset())
+            result_json = call_gemini_fast(prompt)
             data = safe_parse_json(result_json)
 
         return data if data else {"error": "Financial projection unavailable", "raw": result_json[:200] if result_json else ""}
