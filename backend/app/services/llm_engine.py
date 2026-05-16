@@ -1271,21 +1271,82 @@ async def analyze(req: IdeaRequest):
     try:
         full_prompt = ANALYZE_PROMPT + CRITICAL_RULES
 
-        # Gemini only — NIM 70B times out on this large prompt
-        # Use asyncio timeout to cap total wait at 120s
-        print("[ANALYZE] Calling Gemini for main analysis...")
-        try:
-            raw = await asyncio.wait_for(
-                asyncio.to_thread(call_gemini, full_prompt, key_offset=_next_gemini_offset()),
-                timeout=120
-            )
-        except asyncio.TimeoutError:
-            print("[ANALYZE] Gemini timed out at 120s")
-            raw = None
-        data = clean_json(raw) if raw else None
+        # Race NIM (17B) vs Gemini — first valid JSON wins, 120s hard cap
+        print("[ANALYZE] Racing NIM 17B + Gemini in parallel...")
+        nim_off = _next_nim_offset()
+        gem_off = _next_gemini_offset()
 
-        if not data or not data.get("market"):
-            print(f"[HONEST] Gemini returned invalid data for: {idea}")
+        async def _try_nim_analyze():
+            """NIM with higher max_tokens for large JSON output."""
+            if not _NIM_KEY_POOL:
+                return None
+            n = len(_NIM_KEY_POOL)
+            for i in range(min(3, n)):
+                key = _NIM_KEY_POOL[(nim_off + i) % n]
+                try:
+                    r = await asyncio.to_thread(
+                        requests.post,
+                        f"{NIM_BASE_URL}/chat/completions",
+                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                        json={"model": NIM_MODEL_ROAST, "messages": [{"role": "user", "content": full_prompt}],
+                              "max_tokens": 4096, "temperature": 0.2},
+                        timeout=60
+                    )
+                    if r.status_code == 200:
+                        text = r.json()["choices"][0]["message"]["content"].strip()
+                        if text.startswith("```"):
+                            text = text.split("```")[1]
+                            if text.startswith("json"): text = text[4:]
+                            text = text.strip()
+                        d = clean_json(text)
+                        if d and d.get("market"):
+                            print("[ANALYZE] NIM 17B succeeded!")
+                            return d
+                    elif r.status_code == 429:
+                        continue
+                except Exception as e:
+                    print(f"[ANALYZE-NIM] Error: {e}")
+                    continue
+            return None
+
+        async def _try_gemini_analyze():
+            r = await asyncio.to_thread(call_gemini, full_prompt, key_offset=gem_off, max_keys=3)
+            d = clean_json(r) if r else None
+            if d and d.get("market"):
+                print("[ANALYZE] Gemini succeeded!")
+            return d if d and d.get("market") else None
+
+        try:
+            # Use FIRST_COMPLETED — whichever returns valid data first wins
+            tasks = [asyncio.create_task(_try_nim_analyze()), asyncio.create_task(_try_gemini_analyze())]
+            data = None
+            done, pending = await asyncio.wait(tasks, timeout=120, return_when=asyncio.FIRST_COMPLETED)
+
+            for t in done:
+                result = t.result()
+                if isinstance(result, dict) and result.get("market"):
+                    data = result
+                    break
+
+            # If first completer had no valid data, wait for the other
+            if not data and pending:
+                done2, _ = await asyncio.wait(pending, timeout=30)
+                for t in done2:
+                    result = t.result()
+                    if isinstance(result, dict) and result.get("market"):
+                        data = result
+                        break
+
+            # Cancel any remaining tasks
+            for t in pending:
+                t.cancel()
+
+        except Exception as e:
+            print(f"[ANALYZE] Race error: {e}")
+            data = None
+
+        if not data:
+            print(f"[HONEST] All LLM attempts failed for: {idea}")
             return _honest_fallback(idea, mkt_url, mkt_src)
 
         # Fix source fields
