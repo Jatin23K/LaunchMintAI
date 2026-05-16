@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 import concurrent.futures
 
 # Limit concurrent Gemini API calls to avoid 429 rate limiting
-_gemini_semaphore = threading.Semaphore(2)
+_gemini_semaphore = threading.Semaphore(4)
 import random
 
 # Add parent directory to path for imports
@@ -1811,14 +1811,14 @@ class LLMWrapper:
                     _nim_degraded = True
             except Exception as e:
                 print(f" [EXT-NIM] Failed: {e}")
-        # Single Gemini attempt with 1 key
         gem_off = _next_gemini_offset()
         if not _KEY_POOL:
             return "{}"
-        result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[gem_off % len(_KEY_POOL)], timeout=60)
-        if result:
-            return result
-        # Try secondary model if primary fails
+        for i in range(min(3, len(_KEY_POOL))):
+            key = _KEY_POOL[(gem_off + i) % len(_KEY_POOL)]
+            result = _gemini_request(prompt, PRIMARY_MODEL, key, timeout=60)
+            if result:
+                return result
         result = _gemini_request(prompt, SECONDARY_MODEL, _KEY_POOL[(gem_off + 1) % len(_KEY_POOL)], timeout=60)
         if result:
             return result
@@ -1828,13 +1828,15 @@ llm = LLMWrapper()
 
 
 def call_gemini_fast(prompt: str) -> str:
-    """Two-key Gemini attempt for extensions. Primary model, then secondary."""
+    """Multi-key Gemini attempt for extensions. Tries up to 3 keys on primary, then 1 on secondary."""
     if not _KEY_POOL:
         return "{}"
     off = _next_gemini_offset()
-    result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[off % len(_KEY_POOL)], timeout=60)
-    if result:
-        return result
+    for i in range(min(3, len(_KEY_POOL))):
+        key = _KEY_POOL[(off + i) % len(_KEY_POOL)]
+        result = _gemini_request(prompt, PRIMARY_MODEL, key, timeout=60)
+        if result:
+            return result
     result = _gemini_request(prompt, SECONDARY_MODEL, _KEY_POOL[(off + 1) % len(_KEY_POOL)], timeout=60)
     return result if result else "{}"
 
