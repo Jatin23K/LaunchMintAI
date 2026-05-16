@@ -1,4 +1,4 @@
-from app.services.llm_engine import llm, call_gemini, _next_gemini_offset
+from app.services.llm_engine import llm, call_gemini_fast
 from app.extensions.parse_helper import safe_parse_json
 
 
@@ -40,6 +40,6 @@ Return 2-3 scenarios and 2-3 likely acquirers."""
         result_json = llm.analyze(prompt)
         data = safe_parse_json(result_json)
         if not data:
-            result_json = call_gemini(prompt, key_offset=_next_gemini_offset())
+            result_json = call_gemini_fast(prompt)
             data = safe_parse_json(result_json)
         return data if data else {"error": "Exit scenario analysis unavailable"}

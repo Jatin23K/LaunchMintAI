@@ -1817,15 +1817,48 @@ Return ONLY valid JSON.
 # ============================================================================
 class LLMWrapper:
     def analyze(self, prompt: str) -> str:
-        """Extensions call llm.analyze() — NIM first, Gemini fallback."""
+        """Extensions call llm.analyze() — single NIM attempt, then single Gemini attempt.
+        Fast fail: no full key rotation. Extensions are non-critical."""
         print(f" Extension Call: {prompt[:50]}...")
         if _NIM_KEY_POOL:
-            result = call_nim(prompt, NIM_MODEL_EXT, _next_nim_offset())
-            if result and result.strip() != "{}":
-                return result
-        return call_gemini(prompt, key_offset=_next_gemini_offset())
+            nim_off = _next_nim_offset()
+            key = _NIM_KEY_POOL[nim_off % len(_NIM_KEY_POOL)]
+            try:
+                r = requests.post(
+                    f"{NIM_BASE_URL}/chat/completions",
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                    json={"model": NIM_MODEL_EXT, "messages": [{"role": "user", "content": prompt}],
+                          "max_tokens": 4096, "temperature": 0.2},
+                    timeout=30
+                )
+                if r.status_code == 200:
+                    text = r.json()["choices"][0]["message"]["content"].strip()
+                    if text.startswith("```"):
+                        text = text.split("```")[1]
+                        if text.startswith("json"): text = text[4:]
+                        text = text.strip()
+                    if text and text != "{}":
+                        return text
+            except Exception as e:
+                print(f" [EXT-NIM] Failed: {e}")
+        # Single Gemini attempt with 1 key
+        gem_off = _next_gemini_offset()
+        result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[gem_off % len(_KEY_POOL)], timeout=45)
+        if result:
+            return result
+        return "{}"
 
 llm = LLMWrapper()
+
+
+def call_gemini_fast(prompt: str) -> str:
+    """Single-key Gemini attempt for extensions. Fast fail, no rotation."""
+    if not _KEY_POOL:
+        return "{}"
+    off = _next_gemini_offset()
+    result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[off % len(_KEY_POOL)], timeout=45)
+    return result if result else "{}"
+
 
 if __name__ == "__main__":
     import uvicorn
