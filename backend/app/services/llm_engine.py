@@ -1273,17 +1273,33 @@ async def analyze(req: IdeaRequest):
     """
     
     try:
-        # Debug: Print which prompt parts are being sent
-        # print(f"[DEBUG] Sending {len(ANALYZE_PROMPT + CRITICAL_RULES)} chars to Gemini...")
-        
-        raw = call_gemini(ANALYZE_PROMPT + CRITICAL_RULES, key_offset=_next_gemini_offset())
-        
-        # print(f"[DEBUG] Raw AI Response: {raw[:500]}...") # Log first 500 chars
-        
-        data = clean_json(raw)
+        full_prompt = ANALYZE_PROMPT + CRITICAL_RULES
+
+        # Strategy: NIM 70B first (free, fast), Gemini fallback, then retry Gemini
+        raw = None
+        data = None
+
+        if _NIM_KEY_POOL:
+            print("[ANALYZE] Trying NIM 70B first...")
+            raw = call_nim(full_prompt, NIM_MODEL_HEAVY, _next_nim_offset())
+            data = clean_json(raw) if raw else None
+            if data and data.get("market"):
+                print("[ANALYZE] NIM 70B succeeded")
+            else:
+                data = None
+
+        if not data:
+            print("[ANALYZE] Trying Gemini (attempt 1)...")
+            raw = call_gemini(full_prompt, key_offset=_next_gemini_offset())
+            data = clean_json(raw) if raw else None
 
         if not data or not data.get("market"):
-            print(f"[HONEST] AI returned no data or invalid JSON for: {idea}")
+            print("[ANALYZE] Trying Gemini (attempt 2 with different key)...")
+            raw = call_gemini(full_prompt, key_offset=_next_gemini_offset())
+            data = clean_json(raw) if raw else None
+
+        if not data or not data.get("market"):
+            print(f"[HONEST] All LLM attempts failed for: {idea}")
             return _honest_fallback(idea, mkt_url, mkt_src)
 
         # Fix source fields
