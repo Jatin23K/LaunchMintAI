@@ -744,12 +744,13 @@ def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> s
     return call_gemini(prompt, key_offset=key_offset)
 
 
-def call_gemini(prompt, model_id=None, key_offset=0):
+def call_gemini(prompt, model_id=None, key_offset=0, max_keys=3):
     """
     Waterfall strategy with key_offset for parallel call distribution.
     key_offset: start from a different key so parallel calls don't collide.
-      1. Try PRIMARY_MODEL across all keys starting at key_offset — skip 429s instantly
-      2. Fall back to SECONDARY_MODEL across all keys
+    max_keys: limit how many keys to try per model (default 3 to avoid long waits).
+      1. Try PRIMARY_MODEL across max_keys keys starting at key_offset
+      2. Fall back to SECONDARY_MODEL across max_keys keys
       3. Return "{}" if all fail
     """
     if not _KEY_POOL:
@@ -758,24 +759,19 @@ def call_gemini(prompt, model_id=None, key_offset=0):
 
     n = len(_KEY_POOL)
     for model in [PRIMARY_MODEL, SECONDARY_MODEL]:
-        # Rotate pool so this call starts at key_offset
         rotated_pool = [_KEY_POOL[(key_offset + i) % n] for i in range(n)]
-        found_any = False
-        for attempt, key in enumerate(rotated_pool):
-            result = _gemini_request(prompt, model, key)
+        keys_to_try = rotated_pool[:max_keys]
+        for attempt, key in enumerate(keys_to_try):
+            print(f"[GEMINI] Trying {model} key {attempt+1}/{len(keys_to_try)}...")
+            result = _gemini_request(prompt, model, key, timeout=60)
             if result:
-                found_any = True
                 if model == SECONDARY_MODEL:
                     print(f"[GEMINI] Serving via fallback model: {SECONDARY_MODEL}")
                 return result
             else:
-                # Skip dead keys instantly — no sleep between keys
-                # Only log every 3rd failure to reduce noise
                 if attempt % 3 == 0:
                     print(f"[GEMINI] key=...{key[-6:]} failed for {model}, trying next key...")
-        if not found_any:
-            print(f"[GEMINI] All keys exhausted for {model} — escalating to next tier...")
-            time.sleep(1)  # Brief pause between model tiers only
+        print(f"[GEMINI] {max_keys} keys exhausted for {model} — escalating...")
 
     print("[GEMINI] All models and keys failed. Returning empty.")
     return "{}"
@@ -1275,33 +1271,21 @@ async def analyze(req: IdeaRequest):
     try:
         full_prompt = ANALYZE_PROMPT + CRITICAL_RULES
 
-        # Race NIM 70B and Gemini in parallel — first valid result wins
-        print("[ANALYZE] Racing NIM 70B + Gemini in parallel...")
-        nim_off = _next_nim_offset()
-        gem_off = _next_gemini_offset()
+        # Gemini only — NIM 70B times out on this large prompt
+        # Use asyncio timeout to cap total wait at 120s
+        print("[ANALYZE] Calling Gemini for main analysis...")
+        try:
+            raw = await asyncio.wait_for(
+                asyncio.to_thread(call_gemini, full_prompt, key_offset=_next_gemini_offset()),
+                timeout=120
+            )
+        except asyncio.TimeoutError:
+            print("[ANALYZE] Gemini timed out at 120s")
+            raw = None
+        data = clean_json(raw) if raw else None
 
-        async def _try_nim():
-            if not _NIM_KEY_POOL:
-                return None
-            r = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_HEAVY, nim_off)
-            d = clean_json(r) if r else None
-            return d if d and d.get("market") else None
-
-        async def _try_gemini():
-            r = await asyncio.to_thread(call_gemini, full_prompt, key_offset=gem_off)
-            d = clean_json(r) if r else None
-            return d if d and d.get("market") else None
-
-        results = await asyncio.gather(_try_nim(), _try_gemini(), return_exceptions=True)
-        data = None
-        for r in results:
-            if isinstance(r, dict) and r.get("market"):
-                data = r
-                print(f"[ANALYZE] Got valid result from {'NIM' if r is results[0] else 'Gemini'}")
-                break
-
-        if not data:
-            print(f"[HONEST] Both NIM and Gemini failed for: {idea}")
+        if not data or not data.get("market"):
+            print(f"[HONEST] Gemini returned invalid data for: {idea}")
             return _honest_fallback(idea, mkt_url, mkt_src)
 
         # Fix source fields
