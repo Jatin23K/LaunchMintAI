@@ -660,13 +660,31 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90)
         res = requests.post(url, headers={"Content-Type": "application/json"},
                             json=payload, timeout=timeout)
         if res.status_code == 200:
-            parts = res.json()["candidates"][0]["content"]["parts"]
+            resp_json = res.json()
+            candidates = resp_json.get("candidates", [])
+            if not candidates:
+                print(f"[GEMINI] 200 but no candidates — model={model_id} key=...{api_key[-6:]}")
+                # Check for blocked prompt
+                block = resp_json.get("promptFeedback", {}).get("blockReason")
+                if block:
+                    print(f"[GEMINI] Prompt blocked: {block}")
+                return None
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts:
+                finish = candidates[0].get("finishReason", "UNKNOWN")
+                print(f"[GEMINI] 200 but no parts — finish={finish} model={model_id}")
+                return None
             # Skip thinking parts (thought=True), grab first real text
             for part in parts:
                 if not part.get("thought", False) and part.get("text"):
                     return part["text"]
-            # Fallback: return first part text regardless
-            return parts[0].get("text") if parts else None
+            # All parts are thought parts — grab any text we can find
+            for part in parts:
+                if part.get("text"):
+                    print(f"[GEMINI] Only thought parts found, using thought text")
+                    return part["text"]
+            print(f"[GEMINI] 200 but no text in {len(parts)} parts — model={model_id}")
+            return None
         if res.status_code == 429:
             print(f"[GEMINI] 429 rate-limit — model={model_id} key=...{api_key[-6:]}")
             return None
@@ -699,8 +717,12 @@ def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> s
     NIM is OpenAI-compatible — uses requests directly to avoid extra dependency.
     key_offset: spreads parallel calls across different keys.
     """
-    if not _NIM_KEY_POOL:
-        print("[NIM] No NIM keys configured — falling back to Gemini.")
+    global _nim_degraded
+    if not _NIM_KEY_POOL or _nim_degraded:
+        if _nim_degraded:
+            print("[NIM] Skipping — NIM is degraded this session.")
+        else:
+            print("[NIM] No NIM keys configured.")
         return call_gemini(prompt, key_offset=key_offset)
 
     n = len(_NIM_KEY_POOL)
@@ -734,6 +756,10 @@ def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> s
             if res.status_code == 429:
                 print(f"[NIM] 429 — key=...{key[-6:]}, trying next key...")
                 continue
+            if res.status_code == 400 and "DEGRADED" in res.text:
+                print(f"[NIM] DEGRADED — skipping all NIM calls this session")
+                _nim_degraded = True
+                break
             print(f"[NIM] HTTP {res.status_code} — {res.text[:120]}")
         except Exception as e:
             if attempt % 3 == 0:
@@ -744,13 +770,12 @@ def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> s
     return call_gemini(prompt, key_offset=key_offset)
 
 
-def call_gemini(prompt, model_id=None, key_offset=0, max_keys=3):
+def call_gemini(prompt, model_id=None, key_offset=0, max_keys=6):
     """
     Waterfall strategy with key_offset for parallel call distribution.
-    key_offset: start from a different key so parallel calls don't collide.
-    max_keys: limit how many keys to try per model (default 3 to avoid long waits).
-      1. Try PRIMARY_MODEL across max_keys keys starting at key_offset
-      2. Fall back to SECONDARY_MODEL across max_keys keys
+    max_keys: limit how many keys to try per model (default 6 = all keys).
+      1. Try PRIMARY_MODEL across keys starting at key_offset
+      2. Fall back to SECONDARY_MODEL across keys
       3. Return "{}" if all fail
     """
     if not _KEY_POOL:
@@ -760,18 +785,17 @@ def call_gemini(prompt, model_id=None, key_offset=0, max_keys=3):
     n = len(_KEY_POOL)
     for model in [PRIMARY_MODEL, SECONDARY_MODEL]:
         rotated_pool = [_KEY_POOL[(key_offset + i) % n] for i in range(n)]
-        keys_to_try = rotated_pool[:max_keys]
+        keys_to_try = rotated_pool[:min(max_keys, n)]
         for attempt, key in enumerate(keys_to_try):
             print(f"[GEMINI] Trying {model} key {attempt+1}/{len(keys_to_try)}...")
-            result = _gemini_request(prompt, model, key, timeout=60)
+            result = _gemini_request(prompt, model, key, timeout=90)
             if result:
                 if model == SECONDARY_MODEL:
                     print(f"[GEMINI] Serving via fallback model: {SECONDARY_MODEL}")
+                print(f"[GEMINI] SUCCESS with {model} key {attempt+1}")
                 return result
-            else:
-                if attempt % 3 == 0:
-                    print(f"[GEMINI] key=...{key[-6:]} failed for {model}, trying next key...")
-        print(f"[GEMINI] {max_keys} keys exhausted for {model} — escalating...")
+            print(f"[GEMINI] key=...{key[-6:]} failed for {model}")
+        print(f"[GEMINI] All {len(keys_to_try)} keys exhausted for {model} — escalating...")
 
     print("[GEMINI] All models and keys failed. Returning empty.")
     return "{}"
@@ -1271,82 +1295,13 @@ async def analyze(req: IdeaRequest):
     try:
         full_prompt = ANALYZE_PROMPT + CRITICAL_RULES
 
-        # Race NIM (17B) vs Gemini — first valid JSON wins, 120s hard cap
-        print("[ANALYZE] Racing NIM 17B + Gemini in parallel...")
-        nim_off = _next_nim_offset()
-        gem_off = _next_gemini_offset()
+        # Simple Gemini call — no racing, no NIM (NIM is unreliable for large prompts)
+        print("[ANALYZE] Calling Gemini for main analysis (up to 90s)...")
+        raw = await asyncio.to_thread(call_gemini, full_prompt, key_offset=_next_gemini_offset(), max_keys=6)
+        data = clean_json(raw) if raw else None
 
-        async def _try_nim_analyze():
-            """NIM with higher max_tokens for large JSON output."""
-            if not _NIM_KEY_POOL:
-                return None
-            n = len(_NIM_KEY_POOL)
-            for i in range(min(3, n)):
-                key = _NIM_KEY_POOL[(nim_off + i) % n]
-                try:
-                    r = await asyncio.to_thread(
-                        requests.post,
-                        f"{NIM_BASE_URL}/chat/completions",
-                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                        json={"model": NIM_MODEL_ROAST, "messages": [{"role": "user", "content": full_prompt}],
-                              "max_tokens": 4096, "temperature": 0.2},
-                        timeout=60
-                    )
-                    if r.status_code == 200:
-                        text = r.json()["choices"][0]["message"]["content"].strip()
-                        if text.startswith("```"):
-                            text = text.split("```")[1]
-                            if text.startswith("json"): text = text[4:]
-                            text = text.strip()
-                        d = clean_json(text)
-                        if d and d.get("market"):
-                            print("[ANALYZE] NIM 17B succeeded!")
-                            return d
-                    elif r.status_code == 429:
-                        continue
-                except Exception as e:
-                    print(f"[ANALYZE-NIM] Error: {e}")
-                    continue
-            return None
-
-        async def _try_gemini_analyze():
-            r = await asyncio.to_thread(call_gemini, full_prompt, key_offset=gem_off, max_keys=3)
-            d = clean_json(r) if r else None
-            if d and d.get("market"):
-                print("[ANALYZE] Gemini succeeded!")
-            return d if d and d.get("market") else None
-
-        try:
-            # Use FIRST_COMPLETED — whichever returns valid data first wins
-            tasks = [asyncio.create_task(_try_nim_analyze()), asyncio.create_task(_try_gemini_analyze())]
-            data = None
-            done, pending = await asyncio.wait(tasks, timeout=120, return_when=asyncio.FIRST_COMPLETED)
-
-            for t in done:
-                result = t.result()
-                if isinstance(result, dict) and result.get("market"):
-                    data = result
-                    break
-
-            # If first completer had no valid data, wait for the other
-            if not data and pending:
-                done2, _ = await asyncio.wait(pending, timeout=30)
-                for t in done2:
-                    result = t.result()
-                    if isinstance(result, dict) and result.get("market"):
-                        data = result
-                        break
-
-            # Cancel any remaining tasks
-            for t in pending:
-                t.cancel()
-
-        except Exception as e:
-            print(f"[ANALYZE] Race error: {e}")
-            data = None
-
-        if not data:
-            print(f"[HONEST] All LLM attempts failed for: {idea}")
+        if not data or not data.get("market"):
+            print(f"[HONEST] Gemini returned no valid data for: {idea}")
             return _honest_fallback(idea, mkt_url, mkt_src)
 
         # Fix source fields
@@ -1815,12 +1770,15 @@ Return ONLY valid JSON.
 # ============================================================================
 #  LEGACY EXTENSION SUPPORT
 # ============================================================================
+_nim_degraded = False
+
 class LLMWrapper:
     def analyze(self, prompt: str) -> str:
         """Extensions call llm.analyze() — single NIM attempt, then single Gemini attempt.
         Fast fail: no full key rotation. Extensions are non-critical."""
+        global _nim_degraded
         print(f" Extension Call: {prompt[:50]}...")
-        if _NIM_KEY_POOL:
+        if _NIM_KEY_POOL and not _nim_degraded:
             nim_off = _next_nim_offset()
             key = _NIM_KEY_POOL[nim_off % len(_NIM_KEY_POOL)]
             try:
@@ -1839,11 +1797,20 @@ class LLMWrapper:
                         text = text.strip()
                     if text and text != "{}":
                         return text
+                elif r.status_code == 400 and "DEGRADED" in r.text:
+                    print(f" [EXT-NIM] NIM DEGRADED — skipping NIM for all extensions")
+                    _nim_degraded = True
             except Exception as e:
                 print(f" [EXT-NIM] Failed: {e}")
         # Single Gemini attempt with 1 key
         gem_off = _next_gemini_offset()
-        result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[gem_off % len(_KEY_POOL)], timeout=45)
+        if not _KEY_POOL:
+            return "{}"
+        result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[gem_off % len(_KEY_POOL)], timeout=60)
+        if result:
+            return result
+        # Try secondary model if primary fails
+        result = _gemini_request(prompt, SECONDARY_MODEL, _KEY_POOL[(gem_off + 1) % len(_KEY_POOL)], timeout=60)
         if result:
             return result
         return "{}"
@@ -1852,11 +1819,14 @@ llm = LLMWrapper()
 
 
 def call_gemini_fast(prompt: str) -> str:
-    """Single-key Gemini attempt for extensions. Fast fail, no rotation."""
+    """Two-key Gemini attempt for extensions. Primary model, then secondary."""
     if not _KEY_POOL:
         return "{}"
     off = _next_gemini_offset()
-    result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[off % len(_KEY_POOL)], timeout=45)
+    result = _gemini_request(prompt, PRIMARY_MODEL, _KEY_POOL[off % len(_KEY_POOL)], timeout=60)
+    if result:
+        return result
+    result = _gemini_request(prompt, SECONDARY_MODEL, _KEY_POOL[(off + 1) % len(_KEY_POOL)], timeout=60)
     return result if result else "{}"
 
 
