@@ -937,15 +937,22 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     </button>
                                     {deepIntelOpen === key && !deepIntel?.[key as keyof typeof deepIntel] && deepIntelLoading && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4 space-y-3">
-                                            {[...Array(3)].map((_, i) => (
-                                                <div key={i} className="animate-pulse">
-                                                    <div className="h-20 bg-slate-800/60 rounded-xl border border-slate-700/30"></div>
+                                            {key === 'fin' && <>
+                                                <div className="animate-pulse grid grid-cols-3 gap-3">
+                                                    {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-emerald-900/20 rounded-xl border border-emerald-800/20"></div>)}
                                                 </div>
-                                            ))}
-                                            <div className="animate-pulse flex gap-3">
-                                                <div className="h-4 bg-slate-800/40 rounded w-1/3"></div>
-                                                <div className="h-4 bg-slate-800/40 rounded w-1/4"></div>
-                                            </div>
+                                                <div className="animate-pulse h-32 bg-slate-800/40 rounded-xl border border-slate-700/20"></div>
+                                                <div className="animate-pulse flex gap-3"><div className="h-4 bg-emerald-800/20 rounded w-1/3"></div><div className="h-4 bg-slate-800/30 rounded w-1/4"></div></div>
+                                            </>}
+                                            {key === 'gtm' && <>
+                                                {[...Array(3)].map((_, i) => <div key={i} className="animate-pulse flex gap-3 items-center"><div className="w-8 h-8 bg-violet-900/20 rounded-full shrink-0"></div><div className="flex-1 h-14 bg-slate-800/40 rounded-xl"></div></div>)}
+                                                <div className="animate-pulse h-4 bg-violet-800/20 rounded w-2/5"></div>
+                                            </>}
+                                            {key === 'risk' && <>
+                                                <div className="animate-pulse flex items-center gap-2 mb-1"><div className="h-5 w-20 bg-slate-800/40 rounded"></div><div className="h-6 w-16 bg-red-900/20 rounded-full"></div></div>
+                                                {[...Array(3)].map((_, i) => <div key={i} className="animate-pulse h-24 bg-slate-800/40 rounded-xl border border-red-900/10"></div>)}
+                                                <div className="animate-pulse h-14 bg-red-900/10 rounded-xl border border-red-800/20"></div>
+                                            </>}
                                         </div>
                                     )}
                                     {deepIntelOpen === key && deepIntel?.[key as keyof typeof deepIntel] && (
@@ -1101,15 +1108,42 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     </button>
                                     {extIntelOpen === key && !extIntel?.[key as keyof typeof extIntel] && extIntelLoading && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4 space-y-3">
-                                            {[...Array(3)].map((_, i) => (
-                                                <div key={i} className="animate-pulse">
-                                                    <div className="h-16 bg-slate-800/60 rounded-xl border border-slate-700/30"></div>
+                                            {(key === 'personas' || key === 'redFlags') && <>
+                                                {[...Array(3)].map((_, i) => <div key={i} className="animate-pulse p-4 bg-slate-950/60 rounded-xl border border-slate-800/40">
+                                                    <div className="flex justify-between mb-2"><div className={`h-4 w-24 ${key === 'personas' ? 'bg-pink-900/20' : 'bg-rose-900/20'} rounded`}></div><div className="h-3 w-16 bg-slate-800/40 rounded"></div></div>
+                                                    <div className="h-3 bg-slate-800/30 rounded w-4/5 mb-1"></div><div className="h-3 bg-slate-800/30 rounded w-3/5"></div>
+                                                </div>)}
+                                            </>}
+                                            {key === 'pricing' && <>
+                                                <div className="animate-pulse p-4 bg-slate-950/60 rounded-xl border border-slate-800/40">
+                                                    <div className="h-4 w-32 bg-emerald-900/20 rounded mb-3"></div>
+                                                    {[...Array(3)].map((_, i) => <div key={i} className="flex justify-between py-2 border-b border-slate-800/30"><div className="h-3 w-20 bg-slate-800/30 rounded"></div><div className="h-3 w-16 bg-emerald-900/20 rounded"></div></div>)}
                                                 </div>
-                                            ))}
-                                            <div className="animate-pulse flex gap-3">
-                                                <div className="h-4 bg-slate-800/40 rounded w-2/5"></div>
-                                                <div className="h-4 bg-slate-800/40 rounded w-1/4"></div>
-                                            </div>
+                                            </>}
+                                            {key === 'funding' && <>
+                                                <div className="animate-pulse flex items-center gap-4 mb-2"><div className="h-10 w-16 bg-blue-900/20 rounded-lg"></div><div className="h-4 w-32 bg-slate-800/30 rounded"></div></div>
+                                                <div className="animate-pulse grid grid-cols-2 gap-3">
+                                                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/40"><div className="h-3 w-16 bg-slate-800/30 rounded mb-2"></div><div className="h-3 w-full bg-emerald-900/15 rounded mb-1"></div><div className="h-3 w-3/4 bg-emerald-900/15 rounded"></div></div>
+                                                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/40"><div className="h-3 w-12 bg-slate-800/30 rounded mb-2"></div><div className="h-3 w-full bg-red-900/15 rounded mb-1"></div><div className="h-3 w-2/3 bg-red-900/15 rounded"></div></div>
+                                                </div>
+                                            </>}
+                                            {(key === 'legalRisks' || key === 'traction') && <>
+                                                {[...Array(3)].map((_, i) => <div key={i} className="animate-pulse p-4 bg-slate-950/60 rounded-xl border border-slate-800/40">
+                                                    <div className="flex justify-between mb-1"><div className={`h-4 w-28 ${key === 'legalRisks' ? 'bg-yellow-900/20' : 'bg-green-900/20'} rounded`}></div><div className="h-3 w-14 bg-slate-800/30 rounded"></div></div>
+                                                    <div className="h-3 bg-slate-800/25 rounded w-full mt-2"></div>
+                                                </div>)}
+                                            </>}
+                                            {key === 'moat' && <>
+                                                <div className="animate-pulse flex items-center gap-4 mb-2"><div className="h-5 w-28 bg-purple-900/20 rounded"></div><div className="h-5 w-16 bg-slate-800/30 rounded-full"></div><div className="h-4 w-20 bg-slate-800/25 rounded"></div></div>
+                                                <div className="animate-pulse p-3 bg-slate-950/60 rounded-xl border border-slate-800/40"><div className="h-3 w-14 bg-slate-800/30 rounded mb-2"></div><div className="h-3 w-4/5 bg-red-900/15 rounded mb-1"></div><div className="h-3 w-3/5 bg-red-900/15 rounded"></div></div>
+                                            </>}
+                                            {key === 'exit' && <>
+                                                <div className="animate-pulse flex items-center gap-4 mb-2"><div className="h-5 w-24 bg-cyan-900/20 rounded"></div><div className="h-4 w-16 bg-slate-800/25 rounded"></div><div className="h-4 w-20 bg-emerald-900/15 rounded"></div></div>
+                                                {[...Array(2)].map((_, i) => <div key={i} className="animate-pulse p-3 bg-slate-950/60 rounded-xl border border-slate-800/40">
+                                                    <div className="flex justify-between mb-1"><div className="h-4 w-20 bg-slate-800/30 rounded"></div><div className="h-3 w-24 bg-cyan-900/15 rounded"></div></div>
+                                                    <div className="h-3 bg-slate-800/25 rounded w-full mt-1"></div>
+                                                </div>)}
+                                            </>}
                                         </div>
                                     )}
                                     {extIntelOpen === key && !extIntel?.[key as keyof typeof extIntel] && !extIntelLoading && (
