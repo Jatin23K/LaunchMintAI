@@ -11,12 +11,16 @@ import requests
 import re
 import time
 import asyncio
+import threading
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 import concurrent.futures
+
+# Limit concurrent Gemini API calls to avoid 429 rate limiting
+_gemini_semaphore = threading.Semaphore(2)
 import random
 
 # Add parent directory to path for imports
@@ -639,6 +643,7 @@ def validate_and_sanitize(data: dict, source_context: str) -> dict:
 
 def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90) -> str | None:
     """Single attempt against one model + one key. Returns text or None.
+    Uses semaphore to limit concurrent Gemini calls (avoids 429 rate limiting).
 
     Gemini 2.5 Flash returns thinking tokens in parts[0] (thought=True) and the
     real response in a later part. We must skip thought parts to get actual JSON.
@@ -657,8 +662,12 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90)
         }
     }
     try:
-        res = requests.post(url, headers={"Content-Type": "application/json"},
-                            json=payload, timeout=timeout)
+        _gemini_semaphore.acquire()
+        try:
+            res = requests.post(url, headers={"Content-Type": "application/json"},
+                                json=payload, timeout=timeout)
+        finally:
+            _gemini_semaphore.release()
         if res.status_code == 200:
             resp_json = res.json()
             candidates = resp_json.get("candidates", [])
