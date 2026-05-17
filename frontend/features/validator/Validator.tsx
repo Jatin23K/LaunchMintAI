@@ -5,8 +5,10 @@ import {
     ChevronRight, TrendingUp, Users, Scale, Hammer,
     Megaphone, Briefcase, Rocket, Search, Clock,
     ExternalLink, Loader2, AlertTriangle, Link as LinkIcon,
-    Database, Sparkles, Info, DollarSign, Shield, Zap, Lock, Target
+    Database, Sparkles, Info, DollarSign, Shield, Zap, Lock, Target,
+    CheckCircle2, HelpCircle, XCircle, FlaskConical
 } from 'lucide-react';
+import { ClaimStatus, FieldProvenance, ReportCredibilityMeta } from '../../types';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer
@@ -32,6 +34,91 @@ const DataBadge = () => (
 );
 const FmtValue = ({ v, className = "" }: { v: any; className?: string }) =>
     isNF(v) ? <DataBadge /> : <span className={className}>{v}</span>;
+
+// ── Provenance tag ─────────────────────────────────────────────────────────
+const PROV_STYLES: Record<ClaimStatus, { label: string; cls: string; icon: React.ReactNode }> = {
+    verified:    { label: "Verified",    cls: "bg-emerald-900/40 text-emerald-400 border-emerald-700/50", icon: <CheckCircle2 className="w-2.5 h-2.5" /> },
+    estimated:   { label: "Estimated",   cls: "bg-blue-900/40 text-blue-400 border-blue-700/50",         icon: <FlaskConical className="w-2.5 h-2.5" /> },
+    inferred:    { label: "Inferred",    cls: "bg-amber-900/40 text-amber-400 border-amber-700/50",      icon: <HelpCircle className="w-2.5 h-2.5" /> },
+    unsupported: { label: "Unsupported", cls: "bg-slate-800/60 text-slate-500 border-slate-700/50",      icon: <XCircle className="w-2.5 h-2.5" /> },
+};
+
+const ProvTag = ({
+    fieldPath, provenance, tooltip = true
+}: {
+    fieldPath: string;
+    provenance?: Record<string, FieldProvenance>;
+    tooltip?: boolean;
+}) => {
+    const prov = provenance?.[fieldPath];
+    if (!prov) return null;
+    const style = PROV_STYLES[prov.status as ClaimStatus] ?? PROV_STYLES.inferred;
+    return (
+        <span
+            title={tooltip ? (prov.notes || prov.source_quote || prov.status) : undefined}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ml-1.5 cursor-default ${style.cls}`}
+        >
+            {style.icon}
+            {style.label}
+        </span>
+    );
+};
+
+// ── Report credibility summary panel ──────────────────────────────────────────
+const CredibilityPanel = ({ credibility, reportStatus }: {
+    credibility: ReportCredibilityMeta;
+    reportStatus?: string;
+}) => {
+    const score = Math.round(credibility.overall_score * 100);
+    const scoreColor = score >= 60 ? "text-emerald-400" : score >= 30 ? "text-amber-400" : "text-red-400";
+    const statusLabels: Record<string, string> = {
+        complete:          "Complete",
+        partial_grounded:  "Partial — Grounded",
+        partial_inferred:  "Partial — Inferred",
+        failed_validation: "Failed Validation",
+    };
+    return (
+        <div className="w-full bg-slate-950/80 border border-slate-800 rounded-2xl p-4 md:p-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-slate-400" />
+                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Report Credibility</span>
+                    {reportStatus && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider">
+                            {statusLabels[reportStatus] ?? reportStatus}
+                        </span>
+                    )}
+                </div>
+                <span className={`text-lg font-black tracking-tighter ${scoreColor}`}>{score}%</span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+                {[
+                    { label: "Verified",    count: credibility.verified_fields.length,    cls: "text-emerald-400" },
+                    { label: "Estimated",   count: credibility.estimated_fields.length,   cls: "text-blue-400"    },
+                    { label: "Inferred",    count: credibility.inferred_fields.length,    cls: "text-amber-400"   },
+                    { label: "Unsupported", count: credibility.unsupported_fields.length, cls: "text-slate-500"   },
+                ].map(({ label, count, cls }) => (
+                    <div key={label} className="bg-slate-900/60 rounded-xl p-2 border border-slate-800">
+                        <div className={`text-base font-black ${cls}`}>{count}</div>
+                        <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{label}</div>
+                    </div>
+                ))}
+            </div>
+
+            {credibility.conflicts_detected.length > 0 && (
+                <div className="flex items-start gap-2 p-2 rounded-xl bg-amber-900/20 border border-amber-700/40 text-amber-400 text-[10px]">
+                    <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                    <span>{credibility.conflicts_detected.join(" · ")}</span>
+                </div>
+            )}
+
+            <div className="text-[9px] text-slate-600 font-mono">
+                {credibility.claims_extracted} claims extracted · generated {credibility.generated_at?.slice(0, 10)}
+            </div>
+        </div>
+    );
+};
 
 // --- SUB-COMPONENTS FOR 10/10 UX ---
 
@@ -192,6 +279,14 @@ const ForensicDossier = ({ forensics }: { forensics?: any }) => {
         </motion.div>
     );
 };
+
+const SectionDivider = ({ label }: { label: string }) => (
+    <div className="flex items-center gap-4 py-2">
+        <div className="flex-1 h-px bg-slate-800" />
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600">{label}</span>
+        <div className="flex-1 h-px bg-slate-800" />
+    </div>
+);
 
 function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: RealData) => void, data: RealData | null, setData: (r: RealData | null) => void, setStatus: (s: 'idle' | 'processing' | 'active') => void }) {
     const [input, setInput] = useState('');
@@ -689,40 +784,32 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                         onExport={generatePDF}
                     />
 
+                    {/* ── Compact Idea + Verdict Header ── */}
                     {data.god_mode && (
-                        <div className="bg-gradient-to-br from-slate-950 via-emerald-950/20 to-slate-950 border-4 border-emerald-500/50 rounded-[2.5rem] p-6 md:p-12 relative overflow-hidden shadow-[0_0_100px_rgba(16,185,129,0.2)]">
-                            <div className="md:absolute top-0 right-0 p-4 md:p-8 flex justify-center mb-6 md:mb-0">
-                                <RiskBadge riskScore={data.god_mode.risk_score} />
-                            </div>
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-emerald-500/20 rounded-lg"><Sparkles className="w-6 md:w-8 h-6 md:h-8 text-emerald-400" /></div>
-                                    <span className="text-emerald-400 font-bold uppercase tracking-[0.2em] text-[10px] md:text-sm">Final Strategic Verdict</span>
-                                </div>
-                                <h2 className="text-lg md:text-2xl font-bold text-white leading-tight md:pr-40 text-center md:text-left">"{data.god_mode.macro_verdict}"</h2>
-                                <p className="text-emerald-100/70 text-xs md:text-sm leading-relaxed max-w-5xl">{data.god_mode.swarm_summary}</p>
-
-                                <ForensicDossier forensics={data.forensics} />
-
-                                {data.god_mode.pivot_warning && (
-                                    <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/50 rounded-2xl flex items-start gap-3 animate-pulse">
-                                        <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-amber-500 shrink-0" />
-                                        <div>
-                                            <div className="text-amber-500 font-bold text-[10px] md:text-sm uppercase">Strategic Pivot Warning</div>
-                                            <div className="text-amber-200/80 text-xs md:text-sm">{data.god_mode.pivot_warning}</div>
-                                        </div>
-                                    </div>
+                        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600">Startup Idea</span>
+                                <h2 className="text-base md:text-lg font-black text-white leading-snug">{input || data.idea}</h2>
+                                {data.god_mode.macro_verdict && (
+                                    <p className="text-slate-400 text-[11px] leading-relaxed line-clamp-2">"{data.god_mode.macro_verdict}"</p>
                                 )}
                             </div>
+                            <div className="shrink-0">
+                                <RiskBadge riskScore={data.god_mode.risk_score} />
+                            </div>
                         </div>
                     )}
 
-                    {dsData && (
+                    {data.credibility && (
                         <div className="w-full max-w-7xl mx-auto px-4 md:px-0">
-                            <DSInsights data={dsData} />
+                            <CredibilityPanel
+                                credibility={data.credibility}
+                                reportStatus={data.report_status}
+                            />
                         </div>
                     )}
-                    {/* ── END DS INTELLIGENCE LAYER ── */}
+
+                    <SectionDivider label="Core Report" />
 
                     <div className="bg-slate-900/50 border border-slate-800 p-6 md:p-8 rounded-3xl relative">
                         <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
@@ -737,17 +824,26 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                             <div className="space-y-8">
                                 <div className="grid grid-cols-2 gap-6">
                                     <div>
-                                        <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50">TAM ({data.market.current_year || "2024/25"})</div>
+                                        <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50 flex items-center gap-1">
+                                            TAM ({data.market.current_year || "2024/25"})
+                                            <ProvTag fieldPath="market.current_tam" provenance={data.field_provenance} />
+                                        </div>
                                         <FmtValue v={data.market.current_tam} className="text-2xl md:text-3xl font-black text-slate-400 tracking-tighter" />
                                     </div>
                                     <div>
-                                        <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50">TAM ({data.market.forecast_year || "2030"})</div>
+                                        <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50 flex items-center gap-1">
+                                            TAM ({data.market.forecast_year || "2030"})
+                                            <ProvTag fieldPath="market.forecast_tam" provenance={data.field_provenance} />
+                                        </div>
                                         <FmtValue v={data.market.forecast_tam || data.market.size} className="text-4xl md:text-5xl font-black text-white tracking-tighter" />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                                        <div className="text-[10px] text-slate-500 font-bold uppercase mb-1 flex items-center gap-2"><TrendingUp className="w-3 h-3 text-green-400" /> Growth</div>
+                                        <div className="text-[10px] text-slate-500 font-bold uppercase mb-1 flex items-center gap-2">
+                                            <TrendingUp className="w-3 h-3 text-green-400" /> Growth
+                                            <ProvTag fieldPath="market.growth" provenance={data.field_provenance} />
+                                        </div>
                                         <div className="text-green-400 font-bold text-sm md:text-base">{isNF(data.market.growth) ? <DataBadge /> : `CAGR ${data.market.growth}`}</div>
                                     </div>
                                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
@@ -846,7 +942,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                         <div className="space-y-6">
                             <div className="flex items-center gap-3">
                                 <Briefcase className="w-6 h-6 text-violet-400" />
-                                <h2 className="text-2xl font-black text-white">War Room Intel</h2>
+                                <h2 className="text-2xl font-black text-white">Competitive Battlefield</h2>
                                 <span className="text-[10px] font-black text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded-full uppercase tracking-widest">Corporate Spy</span>
                             </div>
 
@@ -908,19 +1004,58 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                         </div>
                     )}
 
-                    {/* ── DEEP INTELLIGENCE EXTENSIONS ── */}
-                    {(deepIntel || deepIntelLoading) && (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <Rocket className="w-6 h-6 text-cyan-400" />
-                                <h2 className="text-2xl font-black text-white">Deep Intelligence</h2>
-                                {deepIntelLoading && <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />}
+                    {data.god_mode && (
+                        <div className="bg-gradient-to-br from-slate-950 via-emerald-950/20 to-slate-950 border-4 border-emerald-500/50 rounded-[2.5rem] p-6 md:p-12 relative overflow-hidden shadow-[0_0_100px_rgba(16,185,129,0.2)]">
+                            <div className="md:absolute top-0 right-0 p-4 md:p-8 flex justify-center mb-6 md:mb-0">
+                                <RiskBadge riskScore={data.god_mode.risk_score} />
                             </div>
-                            {[
-                                { key: 'fin', label: 'Financial Projection', color: 'emerald', icon: Briefcase },
-                                { key: 'gtm', label: 'GTM Strategy', color: 'violet', icon: Megaphone },
-                                { key: 'risk', label: 'Risk Scanner', color: 'red', icon: AlertTriangle },
-                            ].map(({ key, label, color, icon: Icon }) => (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-500/20 rounded-lg"><Sparkles className="w-6 md:w-8 h-6 md:h-8 text-emerald-400" /></div>
+                                    <span className="text-emerald-400 font-bold uppercase tracking-[0.2em] text-[10px] md:text-sm">Strategic Verdict</span>
+                                </div>
+                                <h2 className="text-lg md:text-2xl font-bold text-white leading-tight md:pr-40 text-center md:text-left">"{data.god_mode.macro_verdict}"</h2>
+                                <p className="text-emerald-100/70 text-xs md:text-sm leading-relaxed max-w-5xl">{data.god_mode.swarm_summary}</p>
+
+                                <ForensicDossier forensics={data.forensics} />
+
+                                {data.god_mode.pivot_warning && (
+                                    <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/50 rounded-2xl flex items-start gap-3 animate-pulse">
+                                        <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-amber-500 shrink-0" />
+                                        <div>
+                                            <div className="text-amber-500 font-bold text-[10px] md:text-sm uppercase">Strategic Pivot Warning</div>
+                                            <div className="text-amber-200/80 text-xs md:text-sm">{data.god_mode.pivot_warning}</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── DEEP INTELLIGENCE EXTENSIONS ── */}
+                    {(deepIntel || deepIntelLoading || dsData) && (
+                        <>
+                            <SectionDivider label="Deep Intelligence" />
+
+                            {dsData && (
+                                <div className="w-full max-w-7xl mx-auto px-4 md:px-0">
+                                    <DSInsights data={dsData} />
+                                </div>
+                            )}
+
+                            {(deepIntel || deepIntelLoading) && (
+                                <div className="space-y-4">
+                                    {deepIntelLoading && (
+                                        <div className="flex items-center gap-2">
+                                            <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Loading deep analysis...</span>
+                                        </div>
+                                    )}
+                                    {[
+                                        { key: 'fin', label: 'Financial Projection', color: 'emerald', icon: Briefcase },
+                                        { key: 'gtm', label: 'GTM Strategy', color: 'violet', icon: Megaphone },
+                                        { key: 'risk', label: 'Risk Scanner', color: 'red', icon: AlertTriangle },
+                                    ].map(({ key, label, color, icon: Icon }) => (
                                 <div key={key} className={`bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden`}>
                                     <button
                                         onClick={() => setDeepIntelOpen(deepIntelOpen === key ? null : key)}
@@ -1071,18 +1206,23 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     )}
                                 </div>
                             ))}
-                        </div>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {/* ── EXTENDED INTELLIGENCE ── */}
                     {(extIntel || extIntelLoading) && (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <Users className="w-6 h-6 text-pink-400" />
-                                <h2 className="text-2xl font-black text-white">Extended Intelligence</h2>
-                                {extIntelLoading && <Loader2 className="w-4 h-4 text-pink-400 animate-spin" />}
-                            </div>
-                            {[
+                        <>
+                            <SectionDivider label="Extended Intelligence" />
+                            <div className="space-y-4">
+                                {extIntelLoading && (
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 className="w-4 h-4 text-pink-400 animate-spin" />
+                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Loading extended analysis...</span>
+                                    </div>
+                                )}
+                                {[
                                 { key: 'personas', label: 'User Personas', color: 'pink', icon: Users },
                                 { key: 'redFlags', label: 'Red Flags', color: 'rose', icon: AlertTriangle },
                                 { key: 'pricing', label: 'Pricing Strategy', color: 'emerald', icon: DollarSign },
@@ -1305,7 +1445,8 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                 </div>
                             ))}
                         </div>
-                    )}
+                    </>
+                )}
 
                     {data.citations && data.citations.length > 0 && (
                         <div className="bg-slate-900/30 border border-slate-800/50 rounded-3xl p-6 md:p-8 backdrop-blur-sm">
