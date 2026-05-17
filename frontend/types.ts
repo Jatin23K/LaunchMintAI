@@ -538,6 +538,52 @@ export interface ForensicMetadata {
   bias_assessment: string;
 }
 
+export type CredibilityStatus = 'verified' | 'estimated' | 'inferred' | 'unsupported';
+
+export interface EvidenceSource {
+  url: string;
+  title: string;
+  domain: string;
+  published_at?: string | null;
+  source_tier: string;
+  retrieved_at: string;
+}
+
+export interface EvidenceClaim {
+  claim_id: string;
+  claim_type: string;
+  raw_text: string;
+  normalized_value: string;
+  unit?: string;
+  year?: string | null;
+  quote: string;
+  source_url: string;
+  source_title: string;
+  status: CredibilityStatus;
+  confidence: string;
+  extraction_method: string;
+}
+
+export interface FieldProvenance {
+  field_path: string;
+  status: CredibilityStatus;
+  source_url?: string;
+  source_title?: string;
+  source_quote?: string;
+  source_year?: string | null;
+  notes?: string;
+}
+
+export interface ReportCredibilityMeta {
+  grounded_fields: number;
+  estimated_fields: number;
+  inferred_fields: number;
+  unsupported_fields: number;
+  conflicts_detected: string[];
+  stale_sources: number;
+  generated_at: string;
+}
+
 export interface RealData {
   idea?: string;
   timestamp?: number;
@@ -572,6 +618,10 @@ export interface RealData {
   pivot_suggestion?: { idea: string; potential: string; rationale: string; };
   citations?: { title: string; url: string; }[];
   idea_analysis?: string;
+  credibility?: ReportCredibilityMeta;
+  field_provenance?: Record<string, FieldProvenance>;
+  evidence?: { sources: EvidenceSource[]; claims: EvidenceClaim[] };
+  report_status?: "complete" | "partial_grounded" | "partial_inferred" | "failed_validation";
 }
 
 export interface PitchForgeData {
@@ -590,6 +640,7 @@ export interface SurvivalData {
   top_risk_factors: string[];
   similar_winners: string[];
   similar_losers: string[];
+  model_semantics?: string;
 }
 
 export interface FinancialsData {
@@ -599,6 +650,8 @@ export interface FinancialsData {
   breakeven_probability: number;
   ltv_cac_ratio: number;
   simulations_run: number;
+  assumption_source?: string;
+  model_semantics?: string;
 }
 
 interface SentimentCompetitor {
@@ -611,8 +664,8 @@ interface SentimentCompetitor {
 export interface DSInsightsData {
   survival: SurvivalData;
   financials: FinancialsData;
-  sentiment: { competitors: SentimentCompetitor[] };
-  meta: { pipeline_latency_ms: number; };
+  sentiment: { competitors: SentimentCompetitor[]; signal_source?: string; model_semantics?: string };
+  meta: { pipeline_latency_ms: number; evidence_policy?: string; };
 }
 
 export interface VCRoastData {

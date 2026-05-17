@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MintifyAI - Founder's Copilot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'mat-surface': '#0C0C0F',
+              'mat-surface-variant': '#16161A',
+              'mat-surface-2': '#1D1D22',
+              'mat-primary': '#6C63FF',
+              'mat-primary-container': '#282447',
+              'mat-secondary': '#4DD0E1',
+              'mat-success': '#00E676',
+              'mat-warning': '#FFEA00',
+              'mat-danger': '#FF5252',
+              'mat-text-primary': 'rgba(255,255,255,0.92)',
+              'mat-text-secondary': 'rgba(255,255,255,0.62)',
+              'mat-text-tertiary': 'rgba(255,255,255,0.38)',
+              'mat-outline': 'rgba(255,255,255,0.08)',
+            },
+            boxShadow: {
+              'glow-indigo': '0 0 24px rgba(112, 103, 255, 0.25)',
+              'glow-success': '0 0 18px rgba(0, 230, 118, 0.28)',
+              'glow-danger': '0 0 18px rgba(255, 82, 82, 0.35)',
+            },
+            keyframes: {
+              float: { '0%': { transform: 'translateY(0px)' }, '50%': { transform: 'translateY(-6px)' }, '100%': { transform: 'translateY(0px)' } },
+              shimmer: {
+                '0%': { backgroundPosition: '-200% 0' },
+                '100%': { backgroundPosition: '200% 0' }
+              },
+              sweep: {
+                '0%': { transform: 'translateX(-100%)' },
+                '100%': { transform: 'translateX(100%)' }
+              }
+            },
+            animation: {
+              float: 'float 6s ease-in-out infinite',
+              shimmer: 'shimmer 2s linear infinite',
+              sweep: 'sweep 3s linear infinite'
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+      
+      :root{
+        --bg-900:#0C0C0F;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-900);
+        color: #e6e6ea;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        height: 100vh;
+      }
+      
+      #root { height: 100%; }
+
+      .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      /* Google Material 3 Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #16161A; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #2D2D35; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #4D4D5A; 
+      }
+      
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .mask-gradient {
+        mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "zod": "https://aistudiocdn.com/zod@^3.22.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
