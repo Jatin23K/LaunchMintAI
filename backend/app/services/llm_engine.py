@@ -28,16 +28,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.market_search import search_market_data, format_search_results_for_prompt
-from services.report_credibility import (
-    STATUS_INFERRED,
-    STATUS_UNSUPPORTED,
-    attach_report_credibility,
-    build_evidence_sources,
-    build_fact_table_for_prompt,
-    build_market_fact_table,
+from services.evidence_model import (
     extract_market_claims,
-    sanitize_competitor_candidates,
-    verify_market_report_fields,
+    build_fact_table,
+    format_fact_table_for_prompt,
+    build_provenance,
+    build_credibility_meta,
+    determine_report_status,
 )
 import app.ds.pipeline as ds_pipeline
 
@@ -390,6 +387,8 @@ GIANT_INTEL = {
     },
 }
 
+GIANT_INTEL_KEYS = list(GIANT_INTEL.keys())
+
 def get_giant_data(name):
     name_low = name.lower()
     for key in GIANT_INTEL:
@@ -566,7 +565,7 @@ def _honest_fallback(idea, mkt_url="#", mkt_src=""):
     Returns an honest NOT_FOUND structure when the AI or search fails.
     Never invents numbers. Frontend renders these as '—' / 'Data Not Available'.
     """
-    fallback = {
+    return {
         "market": {
             "current_tam": NOT_FOUND,
             "current_year": NOT_FOUND,
@@ -594,17 +593,6 @@ def _honest_fallback(idea, mkt_url="#", mkt_src=""):
         "strategy_log": {"legal": [], "product": [], "marketing": [], "finance": []},
         "citations": [{"title": mkt_src or "Market Intelligence Report", "url": mkt_url}] if mkt_url and mkt_url != "#" else []
     }
-    evidence_sources = build_evidence_sources(
-        [{"url": mkt_url, "title": mkt_src or "Market Intelligence Report", "snippet": ""}]
-        if mkt_url and mkt_url != "#"
-        else []
-    )
-    fact_table = {
-        "current_tam": {"value": NOT_FOUND, "status": STATUS_UNSUPPORTED},
-        "forecast_tam": {"value": NOT_FOUND, "status": STATUS_UNSUPPORTED},
-        "growth": {"value": NOT_FOUND, "status": STATUS_UNSUPPORTED},
-    }
-    return attach_report_credibility(fallback, fact_table, evidence_sources, evidence_claims=[], competitor_provenance={}, conflict_fields=[])
 
 
 def validate_and_sanitize(data: dict, source_context: str) -> dict:
@@ -951,52 +939,6 @@ def calculate_missing_tam(market_data: dict) -> dict:
         
     return market_data
 
-
-def build_competitor_provenance(competitors: list, source_url: str, source_title: str) -> dict:
-    provenance = {}
-    for idx, comp in enumerate(competitors or []):
-        weakness = comp.get("weakness", NOT_FOUND)
-        pricing = comp.get("product_intel", {}).get("pricing", NOT_FOUND)
-        funding = comp.get("market_fin", {}).get("funding", NOT_FOUND)
-        relevance = comp.get("relevance", "unknown")
-        provenance[f"competitors.{idx}.weakness"] = {
-            "field_path": f"competitors.{idx}.weakness",
-            "status": STATUS_INFERRED if weakness and weakness != NOT_FOUND else STATUS_UNSUPPORTED,
-            "source_url": source_url,
-            "source_title": source_title,
-            "source_quote": "",
-            "source_year": None,
-            "notes": "Competitor weakness synthesized from verified fact table" if weakness and weakness != NOT_FOUND else "No supported competitor weakness available",
-        }
-        provenance[f"competitors.{idx}.product_intel.pricing"] = {
-            "field_path": f"competitors.{idx}.product_intel.pricing",
-            "status": STATUS_INFERRED if pricing and pricing != NOT_FOUND else STATUS_UNSUPPORTED,
-            "source_url": source_url,
-            "source_title": source_title,
-            "source_quote": "",
-            "source_year": None,
-            "notes": "Pricing is currently inferred unless directly sourced",
-        }
-        provenance[f"competitors.{idx}.market_fin.funding"] = {
-            "field_path": f"competitors.{idx}.market_fin.funding",
-            "status": STATUS_INFERRED if funding and funding != NOT_FOUND else STATUS_UNSUPPORTED,
-            "source_url": source_url,
-            "source_title": source_title,
-            "source_quote": "",
-            "source_year": None,
-            "notes": "Funding is currently inferred unless directly sourced",
-        }
-        provenance[f"competitors.{idx}.relevance"] = {
-            "field_path": f"competitors.{idx}.relevance",
-            "status": STATUS_INFERRED,
-            "source_url": source_url,
-            "source_title": source_title,
-            "source_quote": "",
-            "source_year": None,
-            "notes": f"Competitor relevance scored as {relevance}",
-        }
-    return provenance
-
 def classify_industry(idea: str) -> dict:
     """
     Translates a startup idea into a formal industry parent and search term.
@@ -1234,14 +1176,13 @@ async def analyze(req: IdeaRequest):
             if len(extracted) >= 3:
                 break
         comp_names = extracted if len(extracted) >= 3 else ["Industry Leader", "Global Player", "Innovation Rival"]
-    source_objects = search_data.get("source_objects", [])
-    comp_names, low_confidence_competitors = sanitize_competitor_candidates(comp_names, source_objects)
 
     # ── BATCH 3 (parallel): skip AI Judge, run swarm research only ───────────
     # AI Judge removed: it used an extra Gemini call and aggressively filtered
     # valid niche sources, leaving the LLM with zero context. Tavily already
     # quality-filters via tiered domain lists — a second LLM audit is redundant.
     print("[PARALLEL] Batch 3: swarm research (AI Judge disabled)")
+    source_objects = search_data.get("source_objects", [])
     audited_objects = source_objects  # pass through directly — no filtering
     try:
         swarm_intel_list = await asyncio.to_thread(run_swarm, comp_names)
@@ -1252,26 +1193,31 @@ async def analyze(req: IdeaRequest):
     search_data = _apply_audit(search_data, audited_objects)
     mkt_url = search_data['top_source_url'] or "https://www.statista.com"
     mkt_src = search_data['top_source_name'] or "Market Intelligence Report"
-    evidence_sources = build_evidence_sources(search_data.get("source_objects", []))
-    market_claims = extract_market_claims(search_data.get("source_objects", []), industry_name)
-    market_fact_table, conflict_fields = build_market_fact_table(market_claims)
-    verified_fact_table_prompt = build_fact_table_for_prompt(market_fact_table, [])
     grounded_context = format_search_results_for_prompt(search_data)
     swarm_intel_raw = "\n".join(swarm_intel_list)
-    
+
+    # ── Evidence extraction (deterministic, pre-LLM) ─────────────────────────
+    raw_sources = search_data.get("source_objects", [])
+    market_claims = extract_market_claims(raw_sources)
+    fact_table = build_fact_table(market_claims)
+    fact_table_str = format_fact_table_for_prompt(fact_table)
+    print(f"[EVIDENCE] Extracted {len(market_claims)} claims, fact_table keys: {list(fact_table.keys())}")
+
     # 4. FINAL SYNTHESIS (Brain #1: Optimistic Validator)
     ANALYZE_PROMPT = f"""
     # === STEP 4: GENERATE FINAL REPORT (ANALYST LAYER) ===
     You are a Senior Market Intelligence Analyst (Gemini 3).
     Your reputation depends on CITATION ACCURACY.
-    
+
     Task: Analyze the provided "Market Data" and "Competitor Intel" for: "{idea}".
-    
+
+    {fact_table_str}
+
      ANTI-HALLUCINATION & CONTEXT ALIGNMENT:
     1. SUB-MARKET MATCH (CRITICAL): Use figures for the EXACT sub-market, NOT the parent industry.
        Example: "Employee Onboarding Software" (~$1.4B) is NOT "HR Tech" (~$40B) or "HCM" (~$30B).
        If search data shows a specific sub-market figure, use THAT number — do NOT inflate to parent industry.
-    2. SOURCE VERIFICATION: Prefer numbers from market research reports (Statista, Grand View, Mordor, etc.). Blog estimates are acceptable if no better source exists.
+    2. SOURCE VERIFICATION: Prefer numbers from the VERIFIED FACTS block above, then DATA SOURCES below. Label with confidence "High" when using verified facts, "Medium" when estimating.
 
     ══════════════════════════════════════════════════════
     DATA EXTRACTION PROTOCOL
@@ -1295,8 +1241,6 @@ async def analyze(req: IdeaRequest):
    
     DATA SOURCES:
     {grounded_context}
-
-    {verified_fact_table_prompt}
     
     COMPETITOR INTEL:
     {swarm_intel_raw}
@@ -1306,10 +1250,9 @@ async def analyze(req: IdeaRequest):
 
     CRITICAL RULES (STRATEGIC INTELLIGENCE MODE):
     0. **EXTRACTION FIRST**: The REAL-TIME MARKET DATA above contains verified numbers. Extract them EXACTLY.
-    0b. **DO NOT INVENT FACTS**: If the verified fact table marks a value as NOT_FOUND or unsupported, preserve that uncertainty.
     1. MARKET SIZE: Provide BOTH current_tam (2024/2025) AND forecast_tam (2030/2032).
        - Prefer numbers from the DATA SOURCES. If not found there, use your training knowledge.
-       - FORMAT: strictly "$XX.XB" or "$XXB".
+       - FORMAT: strictly "$XX.XB" or "$XXB". Do NOT return "NOT_FOUND" for well-known industries.
     2. GROWTH (CAGR): Extract CAGR from DATA SOURCES. If not there, estimate from your knowledge.
     3. COMPETITORS: Analyze up to 3 competitors. Each must have UNIQUE data — no duplicate descriptions.
        - Include: funding amount, employee count estimate, key differentiator, primary weakness.
@@ -1389,58 +1332,77 @@ async def analyze(req: IdeaRequest):
             print(f"[HONEST] Gemini returned no valid data for: {idea}")
             return _honest_fallback(idea, mkt_url, mkt_src)
 
-        # Bind market facts to extracted evidence before any enrichment
-        data = verify_market_report_fields(data, {"market": market_fact_table})
-
         # Fix source fields
         m_data = data.get("market", {})
         if not m_data.get("source_url") or "{mkt_url}" in str(m_data.get("source_url", "")):
             m_data["source_url"] = mkt_url if mkt_url and mkt_url != "#" else ""
         m_data["source_name"] = professionalize_source(m_data.get("source_name", mkt_src))
-        if market_fact_table.get("current_tam", {}).get("status") in ("verified", "estimated"):
-            m_data["current_year"] = market_fact_table.get("current_tam", {}).get("source_year") or m_data.get("current_year") or "2025"
-        if market_fact_table.get("forecast_tam", {}).get("status") in ("verified", "estimated"):
-            m_data["forecast_year"] = market_fact_table.get("forecast_tam", {}).get("source_year") or m_data.get("forecast_year") or "2030"
-        if market_fact_table.get("current_tam", {}).get("source_quote"):
-            m_data["veracity_quote"] = market_fact_table.get("current_tam", {}).get("source_quote")
-        data["market"] = m_data
 
-        # Use static giant intel only as inferred enrichment when the model omitted fields.
+        # Inject verified Giant Intel for known competitors
         for comp in data.get("competitors", []):
             giant = get_giant_data(comp["name"])
-            comp["relevance"] = "medium"
             if giant:
-                print(f"[GIANT] Applying inferred enrichment for: {comp['name']}")
-                comp["url"] = comp.get("url") or giant["url"]
-                comp["market_fin"] = comp.get("market_fin") or giant["market_fin"]
-                comp["product_intel"] = comp.get("product_intel") or giant["product_intel"]
-                comp["technical_infra"] = comp.get("technical_infra") or giant["technical_infra"]
-                comp["sentiment"] = comp.get("sentiment") or giant["sentiment"]
-                comp["marketing"] = comp.get("marketing") or giant.get("marketing", {})
-                comp["kill_strategy"] = comp.get("kill_strategy") or giant.get("kill_strategy", NOT_FOUND)
-                comp["relevance"] = "high"
-            elif low_confidence_competitors:
-                comp["relevance"] = "low"
+                print(f"[GIANT] Injecting verified data for: {comp['name']}")
+                comp["url"] = giant["url"]
+                comp["market_fin"] = giant["market_fin"]
+                comp["product_intel"] = giant["product_intel"]
+                comp["technical_infra"] = giant["technical_infra"]
+                comp["sentiment"] = giant["sentiment"]
+                comp["marketing"] = giant.get("marketing", comp.get("marketing", {}))
+                comp["kill_strategy"] = giant.get("kill_strategy", comp.get("kill_strategy", NOT_FOUND))
 
         # TAM sanity check: if LLM inflated to parent industry, cap it
         _tam_sanity_check(data.get("market", {}), search_data.get("source_objects", []))
 
+        # Math fallback: calculate current_tam from forecast + CAGR if missing
+        data["market"] = calculate_missing_tam(data["market"])
+
+        # Clear hardcoded placeholder fallbacks — let provenance mark them unsupported
+        # instead of hiding the gap with generic estimates
+        market = data.get("market", {})
+        for field in ["current_tam", "forecast_tam", "growth"]:
+            val = market.get(field, "")
+            if not val or str(val).upper() in ("NOT_FOUND", "N/A", "UNAVAILABLE", ""):
+                market[field] = None  # frontend renders DataBadge for None/null
+        data["market"] = market
+
         data["idea"] = idea
 
-        competitor_provenance = build_competitor_provenance(data.get("competitors", []), mkt_url, mkt_src)
-        data = attach_report_credibility(
-            data,
-            market_fact_table,
-            evidence_sources,
-            evidence_claims=market_claims,
-            competitor_provenance=competitor_provenance,
-            conflict_fields=conflict_fields,
+        # Citations — tied to sources actually used in this report
+        data["citations"] = [
+            {"title": s.get("title", "Market Research Source"), "url": s.get("url", "")}
+            for s in raw_sources
+            if s.get("url") and s.get("url") != "#"
+        ][:8]
+
+        # ── Evidence & provenance layer (additive — does not remove any existing field) ──
+        competitor_names = [c.get("name", "") for c in data.get("competitors", [])]
+        field_provenance = build_provenance(
+            market=data.get("market", {}),
+            claims=market_claims,
+            competitor_names=competitor_names,
+            giant_kb_names=GIANT_INTEL_KEYS,
         )
-        if low_confidence_competitors:
-            data.setdefault("god_mode", {})
-            existing_warning = data["god_mode"].get("pivot_warning")
-            warning = "Competitor discovery confidence is low. Treat rival analysis as directional until direct substitutes are verified."
-            data["god_mode"]["pivot_warning"] = warning if not existing_warning else f"{existing_warning} {warning}"
+        credibility = build_credibility_meta(field_provenance, market_claims)
+        report_status = determine_report_status(credibility)
+
+        data["evidence"] = {
+            "sources": [
+                {
+                    "url": s.get("url", ""),
+                    "title": s.get("title", ""),
+                    "domain": s.get("url", "").split("/")[2] if s.get("url", "").startswith("http") else "",
+                }
+                for s in raw_sources[:6]
+            ],
+            "claims": market_claims,
+        }
+        data["field_provenance"] = field_provenance
+        data["credibility"] = credibility
+        data["report_status"] = report_status
+
+        print(f"[EVIDENCE] report_status={report_status}, score={credibility['overall_score']}, "
+              f"verified={len(credibility['verified_fields'])}, inferred={len(credibility['inferred_fields'])}")
 
         return data
 
