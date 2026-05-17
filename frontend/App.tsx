@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // Components
 import NeuralBackground from './components/NeuralBackground';
-import { LeftHud, RightHud, RecentIntel } from './components/HUD';
+import { RecentIntel } from './components/HUD';
 import HistoryDrawer from './components/HistoryDrawer';
 
 // Features
@@ -96,14 +96,11 @@ export default function App() {
     };
 
     return (
-        <div className="relative min-h-screen flex flex-col overflow-x-hidden bg-[#020617] text-white font-sans selection:bg-cyan-500/30">
+        <div className="relative min-h-screen flex flex-col overflow-x-hidden text-white font-sans selection:bg-cyan-500/30">
             <style>{globalStyles}</style>
 
             <NeuralBackground color={getThemeColor()} />
 
-            <LeftHud status={systemStatus} />
-            <RightHud status={systemStatus} />
-            
             <HistoryDrawer 
                 isOpen={isHistoryOpen} 
                 onClose={() => setIsHistoryOpen(false)} 
@@ -182,7 +179,7 @@ export default function App() {
                 <div className={`w-full flex-1 flex flex-col ${!activeReport && systemStatus === 'idle' ? 'justify-center' : ''}`}>
                     <AnimatePresence mode="wait">
                         <motion.div
-                            key={screen + (activeReport?.idea || '')}
+                            key={screen}
                             initial={{ opacity: 0, scale: 0.98, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 1.02, y: -10 }}
@@ -215,33 +212,12 @@ export default function App() {
                     />
                 )}
 
-                <div className="no-print relative mt-auto py-8 md:py-10 w-full flex flex-col items-center transition-opacity z-50">
-                    <div className="flex flex-col items-center gap-4 transition-opacity duration-1000">
-                        <div className="flex items-center gap-4 text-slate-500 font-mono text-[9px] md:text-[10px] uppercase tracking-[0.4em]">
-                            <div className={`w-1 h-1 rounded-full ${systemStatus === 'idle' ? 'bg-amber-500' : 'bg-cyan-500 animate-ping'}`} />
-                            {systemStatus === 'idle' ? 'SYSTEM STANDBY: AWAITING INPUT' : 'ENGINEERED FOR STRATEGIC DOMINANCE'}
-                        </div>
-                        <div className={`flex flex-wrap justify-center gap-x-6 md:gap-x-12 gap-y-2 md:gap-y-4 text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase transition-colors duration-500 ${systemStatus === 'idle' ? 'text-slate-800' : 'text-slate-600'}`}>
-                            <div className="flex items-center gap-2">
-                                <span>DATA GROUNDING:</span>
-                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-cyan-400'}>{systemStatus === 'idle' ? 'OFFLINE' : 'VERIFIED'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span>NEURAL DEPTH:</span>
-                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-white'}>{systemStatus === 'idle' ? '0-DIM' : '128-DIM'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span>MARKET SYNC:</span>
-                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-emerald-400'}>{systemStatus === 'idle' ? 'IDLE' : 'LIVE'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span>GUARDRAILS:</span>
-                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-purple-400'}>{systemStatus === 'idle' ? 'STANDBY' : 'DEP-7 ACTIVE'}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </main>
+
+            <footer className="no-print relative z-50 w-full border-t border-white/5 py-4 px-6 md:px-8 flex items-center justify-between bg-[#020617]/30 backdrop-blur-sm">
+                <span className="text-slate-500 text-xs font-mono">Brutal startup intelligence, built for founders.</span>
+                <span className="text-slate-600 text-xs font-mono">© {new Date().getFullYear()} Launchmint AI. All rights reserved.</span>
+            </footer>
         </div>
     );
 }

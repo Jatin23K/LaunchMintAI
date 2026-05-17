@@ -12,7 +12,7 @@ import {
     Tooltip, ResponsiveContainer
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RealData, Competitor, DSInsightsData } from '../../types';
+import { RealData, Competitor, DSInsightsData, FieldProvenance, CredibilityStatus } from '../../types';
 import ForensicReport from '../../components/ForensicReport';
 import DSInsights from '../../components/DSInsights';
 import AnalysisHeader from '../../components/AnalysisHeader';
@@ -32,6 +32,39 @@ const DataBadge = () => (
 );
 const FmtValue = ({ v, className = "" }: { v: any; className?: string }) =>
     isNF(v) ? <DataBadge /> : <span className={className}>{v}</span>;
+
+const STATUS_STYLES: Record<CredibilityStatus, string> = {
+    verified: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+    estimated: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    inferred: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+    unsupported: 'bg-slate-700/40 text-slate-300 border-slate-600/40',
+};
+
+const CredibilityBadge = ({ status }: { status?: CredibilityStatus }) => {
+    const safeStatus: CredibilityStatus = status || 'unsupported';
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest ${STATUS_STYLES[safeStatus]}`}>
+            {safeStatus}
+        </span>
+    );
+};
+
+const ProvenanceHint = ({ item }: { item?: FieldProvenance }) => {
+    if (!item) return null;
+    return (
+        <div className="mt-2 space-y-1">
+            <CredibilityBadge status={item.status} />
+            {item.notes && <p className="text-[10px] text-slate-500 leading-relaxed">{item.notes}</p>}
+            {item.source_quote && <p className="text-[10px] text-slate-400 leading-relaxed line-clamp-3">"{item.source_quote}"</p>}
+            {item.source_url && (
+                <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1">
+                    <ExternalLink className="w-3 h-3" />
+                    {item.source_title || 'Source'}
+                </a>
+            )}
+        </div>
+    );
+};
 
 // --- SUB-COMPONENTS FOR 10/10 UX ---
 
@@ -224,6 +257,20 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
         const ageInMs = Date.now() - data.timestamp;
         return ageInMs > 24 * 60 * 60 * 1000;
     }, [data]);
+
+    const getFieldProvenance = (fieldPath: string): FieldProvenance | undefined => data?.field_provenance?.[fieldPath];
+    const renderPanelMeta = (meta: any) => {
+        if (!meta?.provenance_level && !meta?.error_reason) return null;
+        return (
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
+                {meta?.provenance_level && <CredibilityBadge status={meta.provenance_level === 'inferred' ? 'inferred' : meta.provenance_level === 'generated' ? 'unsupported' : 'estimated'} />}
+                {Array.isArray(meta?.evidence_used) && meta.evidence_used.length > 0 && (
+                    <span className="text-[10px] text-slate-500">Inputs: {meta.evidence_used.join(', ')}</span>
+                )}
+                {meta?.error_reason && <span className="text-[10px] text-red-400">Issue: {meta.error_reason}</span>}
+            </div>
+        );
+    };
 
     const renderSource = (market: any, input: string) => {
         let url = market.source_url;
@@ -499,9 +546,9 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                     api.post('/run', { extension_id: 'risk-scanner', payload: extPayload }, deepTimeout),
                 ]).then(([finRes, gtmRes, riskRes]) => {
                     setDeepIntel({
-                        fin: finRes.status === 'fulfilled' ? finRes.value.data?.data : null,
-                        gtm: gtmRes.status === 'fulfilled' ? gtmRes.value.data?.data : null,
-                        risk: riskRes.status === 'fulfilled' ? riskRes.value.data?.data : null,
+                        fin: finRes.status === 'fulfilled' ? { ...(finRes.value.data?.data || {}), _meta: { provenance_level: finRes.value.data?.provenance_level, evidence_used: finRes.value.data?.evidence_used, error_reason: finRes.value.data?.error_reason } } : null,
+                        gtm: gtmRes.status === 'fulfilled' ? { ...(gtmRes.value.data?.data || {}), _meta: { provenance_level: gtmRes.value.data?.provenance_level, evidence_used: gtmRes.value.data?.evidence_used, error_reason: gtmRes.value.data?.error_reason } } : null,
+                        risk: riskRes.status === 'fulfilled' ? { ...(riskRes.value.data?.data || {}), _meta: { provenance_level: riskRes.value.data?.provenance_level, evidence_used: riskRes.value.data?.evidence_used, error_reason: riskRes.value.data?.error_reason } } : null,
                     });
                 }).finally(() => setDeepIntelLoading(false));
 
@@ -519,14 +566,14 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                     api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }, extTimeout),
                 ]).then(([personaRes, redFlagRes, pricingRes, fundingRes, legalRes, tractionRes, moatRes, exitRes]) => {
                     setExtIntel({
-                        personas: personaRes.status === 'fulfilled' ? personaRes.value.data?.data : null,
-                        redFlags: redFlagRes.status === 'fulfilled' ? redFlagRes.value.data?.data : null,
-                        pricing: pricingRes.status === 'fulfilled' ? pricingRes.value.data?.data : null,
-                        funding: fundingRes.status === 'fulfilled' ? fundingRes.value.data?.data : null,
-                        legalRisks: legalRes.status === 'fulfilled' ? legalRes.value.data?.data : null,
-                        traction: tractionRes.status === 'fulfilled' ? tractionRes.value.data?.data : null,
-                        moat: moatRes.status === 'fulfilled' ? moatRes.value.data?.data : null,
-                        exit: exitRes.status === 'fulfilled' ? exitRes.value.data?.data : null,
+                        personas: personaRes.status === 'fulfilled' ? { ...(personaRes.value.data?.data || {}), _meta: { provenance_level: personaRes.value.data?.provenance_level, evidence_used: personaRes.value.data?.evidence_used, error_reason: personaRes.value.data?.error_reason } } : null,
+                        redFlags: redFlagRes.status === 'fulfilled' ? { ...(redFlagRes.value.data?.data || {}), _meta: { provenance_level: redFlagRes.value.data?.provenance_level, evidence_used: redFlagRes.value.data?.evidence_used, error_reason: redFlagRes.value.data?.error_reason } } : null,
+                        pricing: pricingRes.status === 'fulfilled' ? { ...(pricingRes.value.data?.data || {}), _meta: { provenance_level: pricingRes.value.data?.provenance_level, evidence_used: pricingRes.value.data?.evidence_used, error_reason: pricingRes.value.data?.error_reason } } : null,
+                        funding: fundingRes.status === 'fulfilled' ? { ...(fundingRes.value.data?.data || {}), _meta: { provenance_level: fundingRes.value.data?.provenance_level, evidence_used: fundingRes.value.data?.evidence_used, error_reason: fundingRes.value.data?.error_reason } } : null,
+                        legalRisks: legalRes.status === 'fulfilled' ? { ...(legalRes.value.data?.data || {}), _meta: { provenance_level: legalRes.value.data?.provenance_level, evidence_used: legalRes.value.data?.evidence_used, error_reason: legalRes.value.data?.error_reason } } : null,
+                        traction: tractionRes.status === 'fulfilled' ? { ...(tractionRes.value.data?.data || {}), _meta: { provenance_level: tractionRes.value.data?.provenance_level, evidence_used: tractionRes.value.data?.evidence_used, error_reason: tractionRes.value.data?.error_reason } } : null,
+                        moat: moatRes.status === 'fulfilled' ? { ...(moatRes.value.data?.data || {}), _meta: { provenance_level: moatRes.value.data?.provenance_level, evidence_used: moatRes.value.data?.evidence_used, error_reason: moatRes.value.data?.error_reason } } : null,
+                        exit: exitRes.status === 'fulfilled' ? { ...(exitRes.value.data?.data || {}), _meta: { provenance_level: exitRes.value.data?.provenance_level, evidence_used: exitRes.value.data?.evidence_used, error_reason: exitRes.value.data?.error_reason } } : null,
                     });
                 }).finally(() => setExtIntelLoading(false));
             } else {
@@ -689,6 +736,38 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                         onExport={generatePDF}
                     />
 
+                    {data.credibility && (
+                        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 md:p-8">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                                <div>
+                                    <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.25em] mb-2">Credibility Summary</div>
+                                    <h2 className="text-xl md:text-2xl font-black text-white">Report status: {data.report_status?.replace(/_/g, ' ') || 'complete'}</h2>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {isStale && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/15 border border-amber-500/30 text-amber-300">Cached report is stale</span>}
+                                    {data.credibility.stale_sources > 0 && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/15 border border-amber-500/30 text-amber-300">{data.credibility.stale_sources} stale source{data.credibility.stale_sources > 1 ? 's' : ''}</span>}
+                                    {data.credibility.conflicts_detected?.length > 0 && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/15 border border-red-500/30 text-red-300">{data.credibility.conflicts_detected.length} source conflict{data.credibility.conflicts_detected.length > 1 ? 's' : ''}</span>}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {[
+                                    ['Verified', data.credibility.grounded_fields, 'verified'],
+                                    ['Estimated', data.credibility.estimated_fields, 'estimated'],
+                                    ['Inferred', data.credibility.inferred_fields, 'inferred'],
+                                    ['Unsupported', data.credibility.unsupported_fields, 'unsupported'],
+                                ].map(([label, value, status]) => (
+                                    <div key={String(label)} className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="text-[10px] uppercase tracking-widest font-black text-slate-500">{label}</div>
+                                            <CredibilityBadge status={status as CredibilityStatus} />
+                                        </div>
+                                        <div className="text-2xl font-black text-white tracking-tighter">{value}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {data.god_mode && (
                         <div className="bg-gradient-to-br from-slate-950 via-emerald-950/20 to-slate-950 border-4 border-emerald-500/50 rounded-[2.5rem] p-6 md:p-12 relative overflow-hidden shadow-[0_0_100px_rgba(16,185,129,0.2)]">
                             <div className="md:absolute top-0 right-0 p-4 md:p-8 flex justify-center mb-6 md:mb-0">
@@ -739,16 +818,19 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     <div>
                                         <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50">TAM ({data.market.current_year || "2024/25"})</div>
                                         <FmtValue v={data.market.current_tam} className="text-2xl md:text-3xl font-black text-slate-400 tracking-tighter" />
+                                        <ProvenanceHint item={getFieldProvenance('market.current_tam')} />
                                     </div>
                                     <div>
                                         <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-50">TAM ({data.market.forecast_year || "2030"})</div>
                                         <FmtValue v={data.market.forecast_tam || data.market.size} className="text-4xl md:text-5xl font-black text-white tracking-tighter" />
+                                        <ProvenanceHint item={getFieldProvenance('market.forecast_tam')} />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
                                         <div className="text-[10px] text-slate-500 font-bold uppercase mb-1 flex items-center gap-2"><TrendingUp className="w-3 h-3 text-green-400" /> Growth</div>
                                         <div className="text-green-400 font-bold text-sm md:text-base">{isNF(data.market.growth) ? <DataBadge /> : `CAGR ${data.market.growth}`}</div>
+                                        <ProvenanceHint item={getFieldProvenance('market.growth')} />
                                     </div>
                                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
                                         <div className="text-[10px] text-slate-500 font-bold uppercase mb-1 flex items-center gap-2"><Info className="w-3 h-3 text-blue-400" /> Confidence</div>
@@ -795,6 +877,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     >
                                         <div className="flex justify-between items-start mb-2"><span className="font-bold text-slate-200 group-hover:text-white">{c.name}</span><ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-purple-400 transition-colors" /></div>
                                         <p className="text-xs text-red-400 leading-relaxed font-medium">Weakness: {c.weakness}</p>
+                                        <div className="mt-2"><ProvenanceHint item={getFieldProvenance(`competitors.${i}.weakness`)} /></div>
                                     </motion.div>
                                 )) : <div className="text-center py-8 text-slate-500"><Users className="w-12 h-12 mx-auto mb-3 opacity-30" /><p className="text-sm">No competitors identified</p></div>}
                             </div>
@@ -957,6 +1040,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     )}
                                     {deepIntelOpen === key && deepIntel?.[key as keyof typeof deepIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
+                                            {renderPanelMeta((deepIntel[key as keyof typeof deepIntel] as any)?._meta)}
                                             {/* Error fallback for deep intel sections */}
                                             {deepIntel[key as keyof typeof deepIntel]?.error && (
                                                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
@@ -1156,6 +1240,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     )}
                                     {extIntelOpen === key && extIntel?.[key as keyof typeof extIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
+                                            {renderPanelMeta((extIntel[key as keyof typeof extIntel] as any)?._meta)}
                                             {/* Error fallback for any section */}
                                             {extIntel[key as keyof typeof extIntel]?.error && (
                                                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
@@ -1312,11 +1397,18 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                             <div className="flex items-center gap-3 mb-6"><div className="p-2 bg-emerald-500/20 rounded-lg"><Database className="w-5 h-5 text-emerald-400" /></div><h3 className="text-lg font-bold text-white uppercase tracking-wider">Research Grounding</h3></div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {data.citations.map((cite, i) => (
-                                    <a key={i} href={cite.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-950/50 hover:bg-slate-800/50 border border-slate-800 rounded-2xl transition-all group">
-                                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-emerald-500/20 group-hover:text-emerald-400 transition-colors"><LinkIcon className="w-4 h-4" /></div>
-                                        <div className="flex-1 min-w-0"><div className="text-xs font-bold text-slate-300 truncate">{cite.title}</div><div className="text-[10px] text-slate-500 truncate group-hover:text-emerald-500/70 transition-colors">{cite.url}</div></div>
-                                        <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-white transition-colors" />
-                                    </a>
+                                    <div key={i} className="p-3 bg-slate-950/50 hover:bg-slate-800/50 border border-slate-800 rounded-2xl transition-all group">
+                                        <a href={cite.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-emerald-500/20 group-hover:text-emerald-400 transition-colors"><LinkIcon className="w-4 h-4" /></div>
+                                            <div className="flex-1 min-w-0"><div className="text-xs font-bold text-slate-300 truncate">{cite.title}</div><div className="text-[10px] text-slate-500 truncate group-hover:text-emerald-500/70 transition-colors">{cite.url}</div></div>
+                                            <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-white transition-colors" />
+                                        </a>
+                                        {data.evidence?.claims?.find((claim) => claim.source_url === cite.url)?.quote && (
+                                            <p className="mt-3 text-[10px] text-slate-400 leading-relaxed line-clamp-4">
+                                                "{data.evidence.claims.find((claim) => claim.source_url === cite.url)?.quote}"
+                                            </p>
+                                        )}
+                                    </div>
                                 ))}
                             </div>
                         </div>

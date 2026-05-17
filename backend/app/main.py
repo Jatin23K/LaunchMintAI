@@ -93,6 +93,33 @@ EXTENSIONS = {
     'exit-scenarios': ExitScenarios()
 }
 
+
+def infer_extension_provenance(ext_id: str, payload: Any, result: Any) -> tuple[str, list[str], str | None]:
+    inferred_only = {
+        'market-research', 'business-model', 'roadmap-generator', 'decision-simulator',
+        'user-persona', 'fundraising-intelligence', 'strategy-war-room', 'hiring-team',
+        'product-storytelling', 'vision-north-star', 'metrics-kpi', 'financial-projection',
+        'gtm-strategy', 'risk-scanner', 'people-analysis', 'pricing-strategy',
+        'funding-readiness', 'traction-signals', 'moat-analysis', 'exit-scenarios',
+    }
+    if isinstance(result, dict) and result.get("error"):
+        return "generated", [], str(result.get("error"))
+    evidence_used = []
+    if isinstance(payload, dict):
+        if payload.get("market_size"):
+            evidence_used.append("market_size")
+        if payload.get("growth_rate"):
+            evidence_used.append("growth_rate")
+        if payload.get("idea"):
+            evidence_used.append("idea")
+    if ext_id in {'legal-risks', 'legal-compliance', 'document-intelligence', 'competitor-deepdive'}:
+        level = "inferred"
+    elif ext_id in inferred_only:
+        level = "generated"
+    else:
+        level = "inferred"
+    return level, evidence_used, None
+
 @app.post("/run")
 async def run_extension(req: ExtensionRequest):
     ext_id = req.extension_id.replace("_", "-")
@@ -103,10 +130,23 @@ async def run_extension(req: ExtensionRequest):
     
     try:
         result = EXTENSIONS[ext_id].execute(req.payload)
-        return {"status": "success", "data": result}
+        provenance_level, evidence_used, error_reason = infer_extension_provenance(ext_id, req.payload, result)
+        return {
+            "status": "success" if not error_reason else "partial",
+            "data": result,
+            "provenance_level": provenance_level,
+            "evidence_used": evidence_used,
+            "error_reason": error_reason,
+        }
     except Exception as e:
         print(f"    ERROR: {e}")
-        return {"status": "error", "data": {"error": str(e)}}
+        return {
+            "status": "error",
+            "data": {"error": str(e)},
+            "provenance_level": "generated",
+            "evidence_used": [],
+            "error_reason": str(e),
+        }
 
 # =============================================================================
 # LIVE RESEARCH ENGINE ENDPOINT
