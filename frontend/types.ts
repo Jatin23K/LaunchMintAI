@@ -538,62 +538,16 @@ export interface ForensicMetadata {
   bias_assessment: string;
 }
 
-export type CredibilityStatus = 'verified' | 'estimated' | 'inferred' | 'unsupported';
-
-export interface EvidenceSource {
-  url: string;
-  title: string;
-  domain: string;
-  published_at?: string | null;
-  source_tier: string;
-  retrieved_at: string;
-}
-
-export interface EvidenceClaim {
-  claim_id: string;
-  claim_type: string;
-  raw_text: string;
-  normalized_value: string;
-  unit?: string;
-  year?: string | null;
-  quote: string;
-  source_url: string;
-  source_title: string;
-  status: CredibilityStatus;
-  confidence: string;
-  extraction_method: string;
-}
-
-export interface FieldProvenance {
-  field_path: string;
-  status: CredibilityStatus;
-  source_url?: string;
-  source_title?: string;
-  source_quote?: string;
-  source_year?: string | null;
-  notes?: string;
-}
-
-export interface ReportCredibilityMeta {
-  grounded_fields: number;
-  estimated_fields: number;
-  inferred_fields: number;
-  unsupported_fields: number;
-  conflicts_detected: string[];
-  stale_sources: number;
-  generated_at: string;
-}
-
 export interface RealData {
   idea?: string;
   timestamp?: number;
   market: {
     size: string;
-    current_tam?: string;
-    forecast_tam?: string;
+    current_tam?: string | null;
+    forecast_tam?: string | null;
     current_year?: string;
     forecast_year?: string;
-    growth: string;
+    growth: string | null;
     confidence: string;
     source_url: string;
     source_name: string;
@@ -618,9 +572,13 @@ export interface RealData {
   pivot_suggestion?: { idea: string; potential: string; rationale: string; };
   citations?: { title: string; url: string; }[];
   idea_analysis?: string;
-  credibility?: ReportCredibilityMeta;
+  // Evidence & credibility layer (additive — always optional)
+  evidence?: {
+    sources: EvidenceSource[];
+    claims: EvidenceClaim[];
+  };
   field_provenance?: Record<string, FieldProvenance>;
-  evidence?: { sources: EvidenceSource[]; claims: EvidenceClaim[] };
+  credibility?: ReportCredibilityMeta;
   report_status?: "complete" | "partial_grounded" | "partial_inferred" | "failed_validation";
 }
 
@@ -641,6 +599,16 @@ export interface SurvivalData {
   similar_winners: string[];
   similar_losers: string[];
   model_semantics?: string;
+  provenance_level?: string;
+  data_note?: string;
+  feature_explanation?: {
+    sector: string;
+    is_b2b: boolean;
+    has_ai_keyword: boolean;
+    rule_applied: string;
+    confidence_band_method: string;
+    training_note: string;
+  };
 }
 
 export interface FinancialsData {
@@ -650,8 +618,6 @@ export interface FinancialsData {
   breakeven_probability: number;
   ltv_cac_ratio: number;
   simulations_run: number;
-  assumption_source?: string;
-  model_semantics?: string;
 }
 
 interface SentimentCompetitor {
@@ -664,8 +630,8 @@ interface SentimentCompetitor {
 export interface DSInsightsData {
   survival: SurvivalData;
   financials: FinancialsData;
-  sentiment: { competitors: SentimentCompetitor[]; signal_source?: string; model_semantics?: string };
-  meta: { pipeline_latency_ms: number; evidence_policy?: string; };
+  sentiment: { competitors: SentimentCompetitor[] };
+  meta: { pipeline_latency_ms: number; };
 }
 
 export interface VCRoastData {
@@ -674,4 +640,52 @@ export interface VCRoastData {
   competitor_alert: string;
   investment_verdict: string;
   survival_chance: number;
+}
+
+// ── Evidence & Provenance (Validator credibility layer) ───────────────────────
+
+export type ClaimStatus = "verified" | "estimated" | "inferred" | "unsupported";
+export type CredibilityStatus = ClaimStatus;
+
+export interface EvidenceSource {
+  url: string;
+  title: string;
+  domain: string;
+}
+
+export interface EvidenceClaim {
+  claim_id: string;
+  claim_type: "current_tam" | "forecast_tam" | "cagr" | string;
+  raw_text: string;
+  normalized_value: number;
+  unit: "USD_B" | "PCT" | string;
+  year: number | null;
+  quote: string;
+  source_url: string;
+  source_title: string;
+  domain_tier: "tier1" | "tier2" | "tier3";
+  status: ClaimStatus;
+  confidence: number;
+  extraction_method: "regex" | "derived" | "llm";
+}
+
+export interface FieldProvenance {
+  status: ClaimStatus;
+  source_url: string;
+  source_quote: string;
+  source_year: number | null;
+  notes: string;
+}
+
+export interface ReportCredibilityMeta {
+  verified_fields: string[];
+  estimated_fields: string[];
+  inferred_fields: string[];
+  unsupported_fields: string[];
+  grounded_fields: string[];
+  conflicts_detected: string[];
+  stale_sources: string[];
+  generated_at: string;
+  overall_score: number;
+  claims_extracted: number;
 }

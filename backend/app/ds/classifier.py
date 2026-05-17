@@ -376,6 +376,23 @@ def predict(idea: str, market_data: dict = None) -> Dict:
 
     sector = features["sector_encoded"]
 
+    # Explain which rules fired
+    rule_applied = "none"
+    if is_undefined_idea:
+        rule_applied = "P1_cap (undefined niche → ≤0.28)"
+    elif is_strong_ai_b2b:
+        rule_applied = "P2_floor (AI+B2B → ≥0.57)"
+
+    feature_explanation = {
+        "sector": ["AI", "Fintech", "Healthcare", "EdTech", "SaaS",
+                   "E-Commerce", "LegalTech", "Logistics", "RealEstate", "Other"][sector],
+        "is_b2b": bool(features.get("is_b2b")),
+        "has_ai_keyword": bool(features.get("has_ai_keyword")),
+        "rule_applied": rule_applied,
+        "confidence_band_method": "fixed ±0.13 margin (not calibrated)",
+        "training_note": "Model trained on 2,000 synthetic startups with heuristic labels",
+    }
+
     return {
         "survival_probability": round(prob, 2),
         "confidence_band":      [ci_low, ci_high],
@@ -385,4 +402,5 @@ def predict(idea: str, market_data: dict = None) -> Dict:
         "similar_losers":       LOSERS.get(sector, LOSERS[9])[:2],
         "model_version":        "xgb_v1",
         "features_used":        features,
+        "feature_explanation":  feature_explanation,
     }
