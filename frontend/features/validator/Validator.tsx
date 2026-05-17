@@ -459,6 +459,9 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
             console.log("🚀 Cache Hit:", cleanedText);
             setData(cached.data);
             setDsData(cached.dsData);
+            setWarData(cached.warData);
+            setDeepIntel(cached.deepIntel);
+            setExtIntel(cached.extData);
             setInput(cleanedText);
             setIsFromCache(true);
             setStatus('active');
@@ -524,13 +527,12 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                     console.warn('DS insights failed:', dsErr);
                 }
 
-                if (warResponse.status === 'fulfilled') {
-                    setWarData(warResponse.value.data || null);
-                }
+                const resultWarData = warResponse.status === 'fulfilled' ? (warResponse.value.data || null) : null;
+                if (resultWarData) setWarData(resultWarData);
 
                 setData(resultData);
                 setDsData(resultDsData);
-                setCachedResult(cleanedText, resultData, resultDsData);
+                setCachedResult(cleanedText, resultData, resultDsData, resultWarData, null, null);
                 setError(null);
                 setStatus('active');
 
@@ -545,11 +547,13 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                     api.post('/run', { extension_id: 'gtm-strategy', payload: extPayload }, deepTimeout),
                     api.post('/run', { extension_id: 'risk-scanner', payload: extPayload }, deepTimeout),
                 ]).then(([finRes, gtmRes, riskRes]) => {
-                    setDeepIntel({
+                    const deepIntelResult = {
                         fin: finRes.status === 'fulfilled' ? { ...(finRes.value.data?.data || {}), _meta: { provenance_level: finRes.value.data?.provenance_level, evidence_used: finRes.value.data?.evidence_used, error_reason: finRes.value.data?.error_reason } } : null,
                         gtm: gtmRes.status === 'fulfilled' ? { ...(gtmRes.value.data?.data || {}), _meta: { provenance_level: gtmRes.value.data?.provenance_level, evidence_used: gtmRes.value.data?.evidence_used, error_reason: gtmRes.value.data?.error_reason } } : null,
                         risk: riskRes.status === 'fulfilled' ? { ...(riskRes.value.data?.data || {}), _meta: { provenance_level: riskRes.value.data?.provenance_level, evidence_used: riskRes.value.data?.evidence_used, error_reason: riskRes.value.data?.error_reason } } : null,
-                    });
+                    };
+                    setDeepIntel(deepIntelResult);
+                    setCachedResult(cleanedText, resultData, resultDsData, resultWarData, deepIntelResult, null);
                 }).finally(() => setDeepIntelLoading(false));
 
                 // Fire extended intel in background — non-blocking (8 sections)
@@ -565,7 +569,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                     api.post('/run', { extension_id: 'moat-analysis', payload: { idea: cleanedText } }, extTimeout),
                     api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }, extTimeout),
                 ]).then(([personaRes, redFlagRes, pricingRes, fundingRes, legalRes, tractionRes, moatRes, exitRes]) => {
-                    setExtIntel({
+                    const extIntelResult = {
                         personas: personaRes.status === 'fulfilled' ? { ...(personaRes.value.data?.data || {}), _meta: { provenance_level: personaRes.value.data?.provenance_level, evidence_used: personaRes.value.data?.evidence_used, error_reason: personaRes.value.data?.error_reason } } : null,
                         redFlags: redFlagRes.status === 'fulfilled' ? { ...(redFlagRes.value.data?.data || {}), _meta: { provenance_level: redFlagRes.value.data?.provenance_level, evidence_used: redFlagRes.value.data?.evidence_used, error_reason: redFlagRes.value.data?.error_reason } } : null,
                         pricing: pricingRes.status === 'fulfilled' ? { ...(pricingRes.value.data?.data || {}), _meta: { provenance_level: pricingRes.value.data?.provenance_level, evidence_used: pricingRes.value.data?.evidence_used, error_reason: pricingRes.value.data?.error_reason } } : null,
@@ -574,7 +578,9 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                         traction: tractionRes.status === 'fulfilled' ? { ...(tractionRes.value.data?.data || {}), _meta: { provenance_level: tractionRes.value.data?.provenance_level, evidence_used: tractionRes.value.data?.evidence_used, error_reason: tractionRes.value.data?.error_reason } } : null,
                         moat: moatRes.status === 'fulfilled' ? { ...(moatRes.value.data?.data || {}), _meta: { provenance_level: moatRes.value.data?.provenance_level, evidence_used: moatRes.value.data?.evidence_used, error_reason: moatRes.value.data?.error_reason } } : null,
                         exit: exitRes.status === 'fulfilled' ? { ...(exitRes.value.data?.data || {}), _meta: { provenance_level: exitRes.value.data?.provenance_level, evidence_used: exitRes.value.data?.evidence_used, error_reason: exitRes.value.data?.error_reason } } : null,
-                    });
+                    };
+                    setExtIntel(extIntelResult);
+                    setCachedResult(cleanedText, resultData, resultDsData, resultWarData, null, extIntelResult);
                 }).finally(() => setExtIntelLoading(false));
             } else {
                 if (response.reason.name === 'CanceledError' || response.reason.name === 'AbortError') {
@@ -585,7 +591,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
         } catch (err: any) {
             console.error('Analysis error:', err);
             if (err.message === 'TIMEOUT') {
-                setError("Analysis timed out. The backend may be waking up (cold start). Please try again.");
+                setError("Analysis timed out — please try again. This usually resolves on the next attempt.");
             } else {
                 const errorMessage = err.response?.data?.detail ||
                     err.message ||
