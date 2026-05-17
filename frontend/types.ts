@@ -543,11 +543,11 @@ export interface RealData {
   timestamp?: number;
   market: {
     size: string;
-    current_tam?: string;
-    forecast_tam?: string;
+    current_tam?: string | null;
+    forecast_tam?: string | null;
     current_year?: string;
     forecast_year?: string;
-    growth: string;
+    growth: string | null;
     confidence: string;
     source_url: string;
     source_name: string;
@@ -572,6 +572,14 @@ export interface RealData {
   pivot_suggestion?: { idea: string; potential: string; rationale: string; };
   citations?: { title: string; url: string; }[];
   idea_analysis?: string;
+  // Evidence & credibility layer (additive — always optional)
+  evidence?: {
+    sources: EvidenceSource[];
+    claims: EvidenceClaim[];
+  };
+  field_provenance?: Record<string, FieldProvenance>;
+  credibility?: ReportCredibilityMeta;
+  report_status?: "complete" | "partial_grounded" | "partial_inferred" | "failed_validation";
 }
 
 export interface PitchForgeData {
@@ -590,6 +598,16 @@ export interface SurvivalData {
   top_risk_factors: string[];
   similar_winners: string[];
   similar_losers: string[];
+  provenance_level?: string;
+  data_note?: string;
+  feature_explanation?: {
+    sector: string;
+    is_b2b: boolean;
+    has_ai_keyword: boolean;
+    rule_applied: string;
+    confidence_band_method: string;
+    training_note: string;
+  };
 }
 
 export interface FinancialsData {
@@ -621,4 +639,51 @@ export interface VCRoastData {
   competitor_alert: string;
   investment_verdict: string;
   survival_chance: number;
+}
+
+// ── Evidence & Provenance (Validator credibility layer) ───────────────────────
+
+export type ClaimStatus = "verified" | "estimated" | "inferred" | "unsupported";
+
+export interface EvidenceSource {
+  url: string;
+  title: string;
+  domain: string;
+}
+
+export interface EvidenceClaim {
+  claim_id: string;
+  claim_type: "current_tam" | "forecast_tam" | "cagr" | string;
+  raw_text: string;
+  normalized_value: number;
+  unit: "USD_B" | "PCT" | string;
+  year: number | null;
+  quote: string;
+  source_url: string;
+  source_title: string;
+  domain_tier: "tier1" | "tier2" | "tier3";
+  status: ClaimStatus;
+  confidence: number;
+  extraction_method: "regex" | "derived" | "llm";
+}
+
+export interface FieldProvenance {
+  status: ClaimStatus;
+  source_url: string;
+  source_quote: string;
+  source_year: number | null;
+  notes: string;
+}
+
+export interface ReportCredibilityMeta {
+  verified_fields: string[];
+  estimated_fields: string[];
+  inferred_fields: string[];
+  unsupported_fields: string[];
+  grounded_fields: string[];
+  conflicts_detected: string[];
+  stale_sources: string[];
+  generated_at: string;
+  overall_score: number;
+  claims_extracted: number;
 }

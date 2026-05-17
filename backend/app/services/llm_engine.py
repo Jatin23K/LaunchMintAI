@@ -28,6 +28,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.market_search import search_market_data, format_search_results_for_prompt
+from services.evidence_model import (
+    extract_market_claims,
+    build_fact_table,
+    format_fact_table_for_prompt,
+    build_provenance,
+    build_credibility_meta,
+    determine_report_status,
+)
 import app.ds.pipeline as ds_pipeline
 
 load_dotenv()
@@ -378,6 +386,8 @@ GIANT_INTEL = {
         "kill_strategy": "Attack their 0.003$/stream artist payment model by launching a fan-ownership music platform where superfans buy fractional royalty stakes in their favorite artists."
     },
 }
+
+GIANT_INTEL_KEYS = list(GIANT_INTEL.keys())
 
 def get_giant_data(name):
     name_low = name.lower()
@@ -1185,20 +1195,29 @@ async def analyze(req: IdeaRequest):
     mkt_src = search_data['top_source_name'] or "Market Intelligence Report"
     grounded_context = format_search_results_for_prompt(search_data)
     swarm_intel_raw = "\n".join(swarm_intel_list)
-    
+
+    # ── Evidence extraction (deterministic, pre-LLM) ─────────────────────────
+    raw_sources = search_data.get("source_objects", [])
+    market_claims = extract_market_claims(raw_sources)
+    fact_table = build_fact_table(market_claims)
+    fact_table_str = format_fact_table_for_prompt(fact_table)
+    print(f"[EVIDENCE] Extracted {len(market_claims)} claims, fact_table keys: {list(fact_table.keys())}")
+
     # 4. FINAL SYNTHESIS (Brain #1: Optimistic Validator)
     ANALYZE_PROMPT = f"""
     # === STEP 4: GENERATE FINAL REPORT (ANALYST LAYER) ===
     You are a Senior Market Intelligence Analyst (Gemini 3).
     Your reputation depends on CITATION ACCURACY.
-    
+
     Task: Analyze the provided "Market Data" and "Competitor Intel" for: "{idea}".
-    
+
+    {fact_table_str}
+
      ANTI-HALLUCINATION & CONTEXT ALIGNMENT:
     1. SUB-MARKET MATCH (CRITICAL): Use figures for the EXACT sub-market, NOT the parent industry.
        Example: "Employee Onboarding Software" (~$1.4B) is NOT "HR Tech" (~$40B) or "HCM" (~$30B).
        If search data shows a specific sub-market figure, use THAT number — do NOT inflate to parent industry.
-    2. SOURCE VERIFICATION: Prefer numbers from market research reports (Statista, Grand View, Mordor, etc.). Blog estimates are acceptable if no better source exists.
+    2. SOURCE VERIFICATION: Prefer numbers from the VERIFIED FACTS block above, then DATA SOURCES below. Label with confidence "High" when using verified facts, "Medium" when estimating.
 
     ══════════════════════════════════════════════════════
     DATA EXTRACTION PROTOCOL
@@ -1338,27 +1357,52 @@ async def analyze(req: IdeaRequest):
         # Math fallback: calculate current_tam from forecast + CAGR if missing
         data["market"] = calculate_missing_tam(data["market"])
 
-        # Layer 3: light sanity check — do NOT wipe valid LLM values
-        # validate_and_sanitize was too aggressive (wiped values not literally in Tavily text).
-        # We now only ensure NOT_FOUND fields get a training-knowledge fallback.
+        # Clear hardcoded placeholder fallbacks — let provenance mark them unsupported
+        # instead of hiding the gap with generic estimates
         market = data.get("market", {})
         for field in ["current_tam", "forecast_tam", "growth"]:
             val = market.get(field, "")
             if not val or str(val).upper() in ("NOT_FOUND", "N/A", "UNAVAILABLE", ""):
-                if field == "current_tam":   market[field] = "~$5B (est.)"
-                elif field == "forecast_tam": market[field] = "~$12B (est.)"
-                elif field == "growth":       market[field] = "~12% (est.)"
+                market[field] = None  # frontend renders DataBadge for None/null
         data["market"] = market
 
         data["idea"] = idea
 
-        # Inject citations so frontend Research Grounding section always has sources
-        raw_sources = search_data.get("source_objects", [])
+        # Citations — tied to sources actually used in this report
         data["citations"] = [
             {"title": s.get("title", "Market Research Source"), "url": s.get("url", "")}
             for s in raw_sources
             if s.get("url") and s.get("url") != "#"
-        ][:8]  # cap at 8 citations
+        ][:8]
+
+        # ── Evidence & provenance layer (additive — does not remove any existing field) ──
+        competitor_names = [c.get("name", "") for c in data.get("competitors", [])]
+        field_provenance = build_provenance(
+            market=data.get("market", {}),
+            claims=market_claims,
+            competitor_names=competitor_names,
+            giant_kb_names=GIANT_INTEL_KEYS,
+        )
+        credibility = build_credibility_meta(field_provenance, market_claims)
+        report_status = determine_report_status(credibility)
+
+        data["evidence"] = {
+            "sources": [
+                {
+                    "url": s.get("url", ""),
+                    "title": s.get("title", ""),
+                    "domain": s.get("url", "").split("/")[2] if s.get("url", "").startswith("http") else "",
+                }
+                for s in raw_sources[:6]
+            ],
+            "claims": market_claims,
+        }
+        data["field_provenance"] = field_provenance
+        data["credibility"] = credibility
+        data["report_status"] = report_status
+
+        print(f"[EVIDENCE] report_status={report_status}, score={credibility['overall_score']}, "
+              f"verified={len(credibility['verified_fields'])}, inferred={len(credibility['inferred_fields'])}")
 
         return data
 

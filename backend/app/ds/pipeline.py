@@ -66,6 +66,26 @@ def run(idea: str, market_data: dict = None, competitors: list = None) -> Dict:
     except Exception as e:
         results["sentiment"] = {"error": str(e)}
 
+    # ── Provenance labels ──────────────────────────────────────────────
+    if "error" not in results.get("survival", {}):
+        results["survival"]["provenance_level"] = "heuristic"
+        results["survival"]["data_note"] = (
+            "XGBoost classifier trained on 2,000 synthetic startups. "
+            "Outputs are directional signals, not actuarial probabilities."
+        )
+    if "error" not in results.get("financials", {}):
+        results["financials"]["provenance_level"] = "simulation"
+        results["financials"]["data_note"] = (
+            "Monte Carlo (10,000 runs) using sector-calibrated benchmarks. "
+            "Assumes $500K seed, $65K/month burn. Adjust for your actual numbers."
+        )
+    if "error" not in results.get("sentiment", {}):
+        results["sentiment"]["provenance_level"] = "curated_kb"
+        results["sentiment"]["data_note"] = (
+            "VADER scoring over a curated 14-company knowledge base. "
+            "Unknown competitors fall back to sector-level patterns."
+        )
+
     # ── Meta ───────────────────────────────────────────────────────────
     elapsed_ms = int((time.time() - start) * 1000)
     results["meta"] = {
