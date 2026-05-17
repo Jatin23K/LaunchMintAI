@@ -125,6 +125,34 @@ const SurvivalCard = ({ survival }: { survival: DSInsightsData['survival'] }) =>
                     </div>
                 )}
             </div>
+
+            {/* Feature explanation (methodology transparency) */}
+            {survival.feature_explanation && (
+                <div className="mt-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">Model Inputs</div>
+                    <div className="flex flex-wrap gap-2">
+                        {[
+                            { k: "Sector", v: survival.feature_explanation.sector },
+                            { k: "B2B", v: survival.feature_explanation.is_b2b ? "Yes" : "No" },
+                            { k: "AI keyword", v: survival.feature_explanation.has_ai_keyword ? "Yes" : "No" },
+                            ...(survival.feature_explanation.rule_applied !== "none"
+                                ? [{ k: "Rule", v: survival.feature_explanation.rule_applied }]
+                                : []),
+                        ].map(({ k, v }) => (
+                            <span key={k} className="text-[9px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                                {k}: <span className="text-white font-bold">{v}</span>
+                            </span>
+                        ))}
+                    </div>
+                    <div className="text-[9px] text-slate-600 mt-1">{survival.feature_explanation.training_note}</div>
+                </div>
+            )}
+
+            {survival.data_note && (
+                <div className="mt-3 text-[9px] text-slate-600 leading-relaxed border-t border-slate-800 pt-3">
+                    {survival.data_note}
+                </div>
+            )}
         </motion.div>
     );
 };
@@ -195,9 +223,16 @@ const MonteCarloCard = ({ financials }: { financials: DSInsightsData['financials
                 </div>
             </div>
 
-            <div className="mt-3 text-[9px] text-slate-600 font-mono text-center">
-                Burn rate $65K/mo · Sector-calibrated CAC/LTV/churn
-            </div>
+            {(financials as any).data_note && (
+                <div className="mt-3 text-[9px] text-slate-600 leading-relaxed border-t border-slate-800 pt-3">
+                    {(financials as any).data_note}
+                </div>
+            )}
+            {!(financials as any).data_note && (
+                <div className="mt-3 text-[9px] text-slate-600 font-mono text-center">
+                    Burn rate $65K/mo · Sector-calibrated CAC/LTV/churn
+                </div>
+            )}
         </motion.div>
     );
 };
