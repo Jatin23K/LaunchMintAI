@@ -264,8 +264,7 @@ def train_and_save() -> XGBClassifier:
         learning_rate=0.05,
         subsample=0.8,
         colsample_bytree=0.8,
-        use_label_encoder=False,
-        eval_metric="logloss",
+        eval_metric="logloss",   # use_label_encoder removed: deprecated+removed in XGBoost 2.x
         random_state=42,
     )
     model.fit(X_train, y_train)
@@ -318,7 +317,8 @@ def predict(idea: str, market_data: dict = None) -> Dict:
     features = feature_extractor(idea, market_data)
     X = pd.DataFrame([features])[FEATURE_COLS]
 
-    prob      = float(_model.predict_proba(X)[0][1])
+    raw_prob  = float(_model.predict_proba(X)[0][1])
+    prob      = raw_prob if not (raw_prob != raw_prob) else 0.40  # NaN guard → default 40%
 
     # ── Post-processing Override (Rule P1) ────────────────────────
     # Deterministic cap for ideas with no recognizable sector,

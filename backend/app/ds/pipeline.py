@@ -40,6 +40,7 @@ def run(idea: str, market_data: dict = None, competitors: list = None) -> Dict:
     # ── Module 1: Classifier ───────────────────────────────────────────
     try:
         survival = classify(idea, market_data)
+        survival["model_semantics"] = "heuristic"
         results["survival"] = survival
     except Exception as e:
         results["survival"] = {"error": str(e)}
@@ -52,6 +53,8 @@ def run(idea: str, market_data: dict = None, competitors: list = None) -> Dict:
         
         sector  = results.get("survival", {}).get("features_used", {}).get("sector_encoded", 9)
         financials = simulate(sector=sector, seed=seed)
+        financials["assumption_source"] = "sector_benchmark"
+        financials["model_semantics"] = "heuristic"
         results["financials"] = financials
     except Exception as e:
         results["financials"] = {"error": str(e)}
@@ -61,8 +64,15 @@ def run(idea: str, market_data: dict = None, competitors: list = None) -> Dict:
         sector = results.get("survival", {}).get("features_used", {}).get("sector_encoded", 9)
         if not competitors:
             competitors = ["Industry Leader", "Global Incumbent", "Challenger"]
-        sentiment = analyze_competitors(competitors, sector=sector)
-        results["sentiment"] = {"competitors": sentiment}
+        # Accept both name strings and full competitor dicts from /war_room
+        comp_names = [
+            (c.get("name") if isinstance(c, dict) else str(c))
+            for c in competitors
+            if c
+        ] or ["Industry Leader", "Global Incumbent", "Challenger"]
+        sentiment = analyze_competitors(comp_names, sector=sector)
+        signal_source = "named_competitors" if competitors else "sector_fallback"
+        results["sentiment"] = {"competitors": sentiment, "signal_source": signal_source, "model_semantics": "heuristic"}
     except Exception as e:
         results["sentiment"] = {"error": str(e)}
 
@@ -73,6 +83,7 @@ def run(idea: str, market_data: dict = None, competitors: list = None) -> Dict:
         "model_version":     "xgb_v1",
         "pipeline_latency_ms": elapsed_ms,
         "modules_run":       ["classifier", "monte_carlo", "sentiment"],
+        "evidence_policy":   "heuristic_support_only",
     }
 
     return results

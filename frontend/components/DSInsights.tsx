@@ -196,7 +196,7 @@ const MonteCarloCard = ({ financials }: { financials: DSInsightsData['financials
             </div>
 
             <div className="mt-3 text-[9px] text-slate-600 font-mono text-center">
-                Burn rate $65K/mo · Sector-calibrated CAC/LTV/churn
+                Burn rate $65K/mo · {financials.assumption_source === 'sector_benchmark' ? 'Sector benchmark assumptions' : 'Idea-linked assumptions'}
             </div>
         </motion.div>
     );
@@ -225,6 +225,9 @@ const SentimentCard = ({ sentiment }: { sentiment: DSInsightsData['sentiment'] }
                 </div>
             </div>
 
+            <div className="mb-4 text-[9px] text-slate-600 font-mono">
+                Source: {sentiment?.signal_source === 'named_competitors' ? 'Named competitor signals' : 'Sector fallback signals'}
+            </div>
             {competitors.length === 0 ? (
                 <div className="text-center py-8 text-slate-500 text-sm">No competitor pain data available</div>
             ) : (
@@ -311,7 +314,7 @@ export default function DSInsights({ data }: DSInsightsProps) {
             {data.meta?.pipeline_latency_ms !== undefined && (
                 <div className="mt-4 text-center">
                     <span className="text-[9px] font-mono text-slate-600">
-                        DS pipeline completed in {data.meta.pipeline_latency_ms.toFixed(0)} ms
+                        DS pipeline completed in {data.meta.pipeline_latency_ms.toFixed(0)} ms · {data.meta.evidence_policy || 'heuristic_support_only'}
                     </span>
                 </div>
             )}

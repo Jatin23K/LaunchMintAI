@@ -26,17 +26,17 @@ const NeuralBackground = ({ color }: { color: string }) => {
         let h = canvas.height = window.innerHeight;
         let particles: any[] = [];
 
-        const particleCount = Math.min(Math.floor(window.innerWidth * window.innerHeight / 10000), 180);
-        const connectionDistance = 160;
+        const particleCount = Math.min(Math.floor(window.innerWidth * window.innerHeight / 8000), 200);
+        const connectionDistance = 150;
 
         class Particle {
             x: number; y: number; vx: number; vy: number; radius: number;
             constructor() {
                 this.x = Math.random() * w;
                 this.y = Math.random() * h;
-                this.vx = Math.random() * 0.6 - 0.3;
-                this.vy = Math.random() * 0.6 - 0.3;
-                this.radius = Math.random() * 1.5 + 0.5;
+                this.vx = Math.random() * 0.5 - 0.25;
+                this.vy = Math.random() * 0.5 - 0.25;
+                this.radius = Math.random() * 1.8 + 0.5;
             }
             update() {
                 this.x += this.vx;
@@ -48,7 +48,7 @@ const NeuralBackground = ({ color }: { color: string }) => {
                 if (!ctx) return;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(${rgb}, 0.8)`;
+                ctx.fillStyle = `rgba(${rgb}, 0.9)`;
                 ctx.fill();
             }
         }
@@ -69,7 +69,7 @@ const NeuralBackground = ({ color }: { color: string }) => {
                     if (dist < connectionDistance) {
                         const opacity = 1 - (dist / connectionDistance);
                         ctx.beginPath();
-                        ctx.strokeStyle = `rgba(${rgb}, ${opacity * 0.4})`;
+                        ctx.strokeStyle = `rgba(${rgb}, ${opacity * 0.45})`;
                         ctx.lineWidth = 0.5;
                         ctx.moveTo(particles[i].x, particles[i].y);
                         ctx.lineTo(particles[j].x, particles[j].y);
@@ -125,7 +125,7 @@ const NeuralBackground = ({ color }: { color: string }) => {
 
     return (
         <div className="fixed inset-0 z-[-10] overflow-hidden pointer-events-none bg-[#020617]">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(10,15,30,0)_0%,rgba(2,6,23,1)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(10,15,30,0)_0%,rgba(2,6,23,0.6)_100%)]" />
             <div
                 ref={lightRef}
                 className="absolute inset-0 pointer-events-none"
@@ -133,9 +133,9 @@ const NeuralBackground = ({ color }: { color: string }) => {
                     background: `radial-gradient(600px circle at ${smoothPos.current.x}px ${smoothPos.current.y}px, rgba(${rgb}, 0.15), transparent 80%)`
                 }}
             />
-            <div className={`absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-[150px] opacity-10 transition-colors duration-1000`} style={{ backgroundColor: `rgb(${rgb})` }}></div>
-            <div className={`absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full blur-[150px] opacity-10 transition-colors duration-1000`} style={{ backgroundColor: `rgb(${rgb})` }}></div>
-            <canvas ref={canvasRef} className="absolute inset-0 opacity-80" />
+            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-[150px] opacity-[0.15] transition-colors duration-1000" style={{ backgroundColor: `rgb(${rgb})` }} />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full blur-[150px] opacity-[0.15] transition-colors duration-1000" style={{ backgroundColor: `rgb(${rgb})` }} />
+            <canvas ref={canvasRef} className="absolute inset-0 opacity-[0.85]" />
         </div>
     );
 };
