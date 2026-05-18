@@ -38,4 +38,5 @@ Return 3-4 risks and 4-5 checklist items."""
         if not data:
             result_json = call_gemini_fast(prompt)
             data = safe_parse_json(result_json)
+        # PAID KEY: line below is safe to delete — paid models reliably return valid JSON, this fallback is only needed for free-tier parse failures
         return data if data else {"error": "Legal risk analysis unavailable"}

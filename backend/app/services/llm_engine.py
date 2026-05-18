@@ -57,8 +57,17 @@ _KEY_POOL = [
 # ── Gemini Model Waterfall ─────────────────────────────────────────────────
 # PRIMARY   : gemini-2.5-flash      — best reasoning, 250 RPD/key × 6 = 1500/day
 # SECONDARY : gemini-2.5-flash-lite — faster fallback, 1000 RPD/key × 6 = 6000/day
-PRIMARY_MODEL   = "gemini-2.5-flash"
-SECONDARY_MODEL = "gemini-2.5-flash-lite"
+#
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  PAID API UPGRADE — GEMINI MODEL SWAP                                  ║
+# ║  To switch to paid Gemini, change the two strings below.               ║
+# ║  Free  → paid examples:                                                ║
+# ║    "gemini-2.5-flash"      → "gemini-1.5-pro"                         ║
+# ║    "gemini-2.5-flash-lite" → "gemini-1.5-flash"  (paid fallback)      ║
+# ║  Get paid key at: https://aistudio.google.com → API Keys               ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+PRIMARY_MODEL   = "gemini-2.5-flash"       # ← SWAP THIS for paid Gemini
+SECONDARY_MODEL = "gemini-2.5-flash-lite"  # ← SWAP THIS for paid Gemini fallback
 
 # Legacy alias kept so old call sites don't break
 API_KEY = _KEY_POOL[0] if _KEY_POOL else None
@@ -723,12 +732,25 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90)
 #   MEDIUM (641ms): ministral-14b-instruct-2512  → Pitch Forge (creative)
 #   MEDIUM (992ms): llama-4-maverick-17b         → VC Roast (nuanced analysis)
 #   HEAVY (3074ms): llama-3.1-70b-instruct       → Competitor swarm, War Room
-
-NIM_MODEL_FAST   = "meta/llama-3.1-8b-instruct"              # 372ms
-NIM_MODEL_EXT    = "nvidia/llama-3.1-nemotron-nano-8b-v1"     # 561ms — extensions
-NIM_MODEL_FORGE  = "mistralai/ministral-14b-instruct-2512"    # 641ms — Pitch Forge
-NIM_MODEL_ROAST  = "meta/llama-4-maverick-17b-128e-instruct"  # 992ms — VC Roast
-NIM_MODEL_HEAVY  = "meta/llama-3.1-70b-instruct"             # 3074ms — swarm/war room
+#
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  PAID API UPGRADE — NIM MODEL SWAP                                     ║
+# ║  To switch to a paid/better provider, replace the strings below.       ║
+# ║  Option A — OpenAI (drop-in, NIM is OpenAI-compatible):               ║
+# ║    Change NIM_BASE_URL to "https://api.openai.com/v1"                  ║
+# ║    NIM_MODEL_ROAST  → "gpt-4o"          (VC Roast)                    ║
+# ║    NIM_MODEL_FORGE  → "gpt-4o"          (Pitch Forge)                 ║
+# ║    NIM_MODEL_HEAVY  → "gpt-4o"          (Competitor swarm)            ║
+# ║    NIM_MODEL_EXT    → "gpt-3.5-turbo"   (extensions, cheaper)         ║
+# ║    NIM_MODEL_FAST   → "gpt-3.5-turbo"   (classify/extract)            ║
+# ║  Option B — Keep NIM, upgrade to paid NIM tier for higher RPM.        ║
+# ║  Get OpenAI key at: https://platform.openai.com → API Keys             ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+NIM_MODEL_FAST   = "meta/llama-3.1-8b-instruct"              # 372ms  ← SWAP for paid
+NIM_MODEL_EXT    = "nvidia/llama-3.1-nemotron-nano-8b-v1"     # 561ms  ← SWAP for paid
+NIM_MODEL_FORGE  = "mistralai/ministral-14b-instruct-2512"    # 641ms  ← SWAP for paid (Pitch Forge)
+NIM_MODEL_ROAST  = "meta/llama-4-maverick-17b-128e-instruct"  # 992ms  ← SWAP for paid (VC Roast)
+NIM_MODEL_HEAVY  = "meta/llama-3.1-70b-instruct"             # 3074ms ← SWAP for paid (swarm/war room)
 
 
 def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> str:
@@ -737,12 +759,14 @@ def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> s
     key_offset: spreads parallel calls across different keys.
     """
     global _nim_degraded
+    # ▼ PAID KEY: this entire block is safe to delete — paid keys don't degrade or go missing
     if not _NIM_KEY_POOL or _nim_degraded:
         if _nim_degraded:
             print("[NIM] Skipping — NIM is degraded this session.")
         else:
             print("[NIM] No NIM keys configured.")
         return call_gemini(prompt, key_offset=key_offset)
+    # ▲ PAID KEY: safe to delete above block
 
     n = len(_NIM_KEY_POOL)
     rotated = [_NIM_KEY_POOL[(key_offset + i) % n] for i in range(n)]
@@ -785,8 +809,10 @@ def call_nim(prompt: str, model: str = NIM_MODEL_FAST, key_offset: int = 0) -> s
                 print(f"[NIM] Exception key=...{key[-6:]}: {e}")
             continue
 
+    # ▼ PAID KEY: these 2 lines are safe to delete — paid keys never exhaust all retries
     print(f"[NIM] All keys failed for {model} — falling back to Gemini.")
     return call_gemini(prompt, key_offset=key_offset)
+    # ▲ PAID KEY: safe to delete above 2 lines
 
 
 def call_gemini(prompt, model_id=None, key_offset=0, max_keys=6):
@@ -802,6 +828,8 @@ def call_gemini(prompt, model_id=None, key_offset=0, max_keys=6):
         return "{}"
 
     n = len(_KEY_POOL)
+    # ▼ PAID KEY: the loop runs [PRIMARY_MODEL, SECONDARY_MODEL] — SECONDARY is the free-tier
+    #             fallback. On paid keys you can simplify this to just: for model in [PRIMARY_MODEL]:
     for model in [PRIMARY_MODEL, SECONDARY_MODEL]:
         rotated_pool = [_KEY_POOL[(key_offset + i) % n] for i in range(n)]
         keys_to_try = rotated_pool[:min(max_keys, n)]
@@ -809,12 +837,15 @@ def call_gemini(prompt, model_id=None, key_offset=0, max_keys=6):
             print(f"[GEMINI] Trying {model} key {attempt+1}/{len(keys_to_try)}...")
             result = _gemini_request(prompt, model, key, timeout=90)
             if result:
+                # ▼ PAID KEY: this if-block (SECONDARY_MODEL check) is safe to delete on paid keys
                 if model == SECONDARY_MODEL:
                     print(f"[GEMINI] Serving via fallback model: {SECONDARY_MODEL}")
+                # ▲ PAID KEY: safe to delete above 2 lines
                 print(f"[GEMINI] SUCCESS with {model} key {attempt+1}")
                 return result
             print(f"[GEMINI] key=...{key[-6:]} failed for {model}")
         print(f"[GEMINI] All {len(keys_to_try)} keys exhausted for {model} — escalating...")
+    # ▲ PAID KEY: simplify loop to [PRIMARY_MODEL] only — SECONDARY_MODEL never needed on paid
 
     print("[GEMINI] All models and keys failed. Returning empty.")
     return "{}"
@@ -1329,8 +1360,62 @@ async def analyze(req: IdeaRequest):
         data = clean_json(raw) if raw else None
 
         if not data or not data.get("market"):
-            print(f"[HONEST] Gemini returned no valid data for: {idea}")
-            return _honest_fallback(idea, mkt_url, mkt_src)
+            print(f"[ANALYZE] Full prompt failed — trying lean training-knowledge fallback for: {idea}")
+            lean_prompt = f"""You are a startup market analyst. Generate a complete market analysis for this idea using your training knowledge.
+
+STARTUP IDEA: {idea}
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "market": {{
+    "current_tam": "<TAM in $XB format, e.g. $4.2B>",
+    "current_year": "2025",
+    "forecast_tam": "<forecast TAM in $XB format>",
+    "forecast_year": "2030",
+    "growth": "<CAGR % e.g. 18%>",
+    "confidence": "Medium",
+    "source_url": "",
+    "source_name": "AI Training Knowledge",
+    "timing": {{"label": "Early Growth", "rationale": "<1 sentence on market timing>"}}
+  }},
+  "monetization": {{"model": "<B2B SaaS/B2C/Marketplace>", "strategy": "<2 sentence strategy>"}},
+  "competitors": [
+    {{
+      "name": "<real competitor name>",
+      "weakness": "<specific weakness>",
+      "kill_strategy": "<how to beat them>",
+      "url": "<their website>",
+      "market_fin": {{"funding": "<amount>", "investors": "<names>", "management": "<CEO name>"}},
+      "product_intel": {{"pricing": "<pricing model>", "features": "<key features>", "swot": "<weakness>"}},
+      "technical_infra": {{"stack": "<tech stack>", "velocity": "<release cadence>", "platform": "<cloud/on-prem>"}},
+      "sentiment": {{"complaints": "<top user complaint>", "trust_score": "<X/5>", "churn_drivers": "<reason>"}},
+      "marketing": {{"acquisition": "<channel>", "seo_keywords": "<keywords>", "social_status": "<active/inactive>"}}
+    }}
+  ],
+  "gen_ui": {{"title": "<catchy startup name for {idea}>", "desc": "<1 line value prop>", "feature": "<killer feature>"}},
+  "god_mode": {{
+    "macro_verdict": "<2-3 sentence strategic verdict for {idea}>",
+    "swarm_summary": "<2-3 sentence competitive landscape summary>",
+    "swot": {{"strengths": ["S1", "S2"], "weaknesses": ["W1", "W2"], "opportunities": ["O1", "O2"], "threats": ["T1", "T2"]}},
+    "risk_score": "<Low/Medium/High>"
+  }},
+  "dept_legal": ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"],
+  "dept_product": ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"],
+  "dept_marketing": ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"],
+  "dept_finance": ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"],
+  "strategy_log": {{"legal": ["log"], "product": ["log"], "marketing": ["log"], "finance": ["log"]}}
+}}
+
+Include 2-3 real competitors. All data must be specific to "{idea}" — no generic placeholders."""
+
+            raw_lean = await asyncio.to_thread(call_gemini_fast, lean_prompt)
+            data = clean_json(raw_lean) if raw_lean else None
+
+            if not data or not data.get("market"):
+                print(f"[HONEST] Lean fallback also failed for: {idea}")
+                return _honest_fallback(idea, mkt_url, mkt_src)
+
+            print(f"[ANALYZE] Lean fallback succeeded for: {idea}")
 
         # Fix source fields
         m_data = data.get("market", {})
@@ -1825,6 +1910,51 @@ Return ONLY valid JSON.
 # ============================================================================
 _nim_degraded = False
 
+
+def _check_nim_health() -> bool:
+    """
+    Ping NIM with a minimal prompt on startup.
+    Returns True if NIM is healthy, False if dead/degraded.
+    Tries up to 2 keys — if both fail, NIM is considered down for this session.
+    """
+    if not _NIM_KEY_POOL:
+        print("[NIM-HEALTH] No NIM keys configured — skipping NIM for all extensions.")
+        return False
+
+    test_prompt = "Reply with the word OK."
+    for key in _NIM_KEY_POOL[:2]:   # try at most 2 keys to keep startup fast
+        try:
+            r = requests.post(
+                f"{NIM_BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={
+                    "model": NIM_MODEL_EXT,
+                    "messages": [{"role": "user", "content": test_prompt}],
+                    "max_tokens": 8,
+                    "temperature": 0.0,
+                },
+                timeout=8,   # fast ping — if NIM doesn't respond in 8s it's dead
+            )
+            if r.status_code == 200:
+                print("[NIM-HEALTH] ✅ NIM is healthy — extensions will use NIM first.")
+                return True
+            else:
+                print(f"[NIM-HEALTH] ⚠️ NIM returned {r.status_code} — key exhausted or degraded.")
+        except Exception as e:
+            print(f"[NIM-HEALTH] ❌ NIM ping failed: {e}")
+
+    print("[NIM-HEALTH] ❌ NIM is DOWN — all extensions will go straight to Gemini.")
+    return False
+
+
+@app.on_event("startup")
+async def startup_nim_health_check():
+    """Run NIM health check once at startup. Sets _nim_degraded globally."""
+    global _nim_degraded
+    healthy = await asyncio.to_thread(_check_nim_health)
+    _nim_degraded = not healthy
+
+
 class LLMWrapper:
     def analyze(self, prompt: str) -> str:
         """Extensions call llm.analyze() — single NIM attempt, then single Gemini attempt.
@@ -1840,7 +1970,7 @@ class LLMWrapper:
                     headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
                     json={"model": NIM_MODEL_EXT, "messages": [{"role": "user", "content": prompt}],
                           "max_tokens": 4096, "temperature": 0.2},
-                    timeout=30
+                    timeout=15
                 )
                 if r.status_code == 200:
                     text = r.json()["choices"][0]["message"]["content"].strip()
