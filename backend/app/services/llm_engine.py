@@ -1578,73 +1578,225 @@ async def war_room(request: IdeaRequest):
         }
 
 # ============================================================================
-# [SKEPTIC] VC ROAST ENDPOINT ("THE SKEPTIC")
+# [SKEPTIC] VC ROAST ENDPOINT ("THE SKEPTIC") — TWO-STEP PIPELINE
+# Step 1: Classifier locks tier + survival_chance + verdict (Flash-Lite, fast)
+# Step 2: Roaster writes brutal text with locked values (Flash, quality)
 # ============================================================================
+
+VC_ROAST_CLASSIFIER_PROMPT = """
+You are a neutral startup idea tier classifier. Your ONLY job is to assign the correct tier to this startup idea based on objective criteria. You do not write opinions or analysis — only classify.
+
+TIER DEFINITIONS:
+
+TIER 1 (survival_chance 1–8, verdict LAUGHABLE):
+Consumer app with massive incumbents. "Uber for X" clones. NFT/crypto/metaverse in dead markets. Social networks for niches. No real B2B revenue model.
+Examples: dog walking app, parking Airbnb, pet social network, NFT marketplace, crypto payment gateway, co-founder Tinder clone, food delivery app for campuses, private chef booking app, gaming subscription box, book review social app, metaverse real estate, on-demand car wash app, influencer merch platform, Web3 loyalty rewards, bill-splitting app, freelance marketplace for designers
+
+TIER 2 (survival_chance 9–20, verdict HARD PASS):
+Real B2B problem BUT the idea is a SINGLE THIN FEATURE with no end-to-end workflow ownership. Incumbents already ship this feature natively. No proprietary data moat.
+Examples: generic AI chatbot for any industry, basic CRM add-on, generic analytics dashboard, D2C supplement brand
+
+TIER 3 (survival_chance 21–40, verdict WEAK MAYBE):
+Vertical SaaS that OWNS a complete end-to-end workflow for a specific named industry. Real measurable pain point. Funded rivals exist but the workflow niche is defensible.
+Examples: HIPAA compliance SaaS for mid-size hospitals, auto repair shop inventory/billing SaaS, AI contract risk scanner for Fortune 500 legal teams, B2B procurement automation for mid-market manufacturers, lease abstraction SaaS for commercial real estate, practice management SaaS for vet clinics, permit and inspection workflow SaaS for construction companies, fleet maintenance and DOT compliance SaaS for trucking, menu cost optimization SaaS for restaurant chains, regulatory compliance SaaS for community banks, churn analytics platform for B2B SaaS, no-code tool builder for logistics ops teams
+
+TIER 4 (survival_chance 41–60, verdict CONDITIONAL INTEREST):
+Enterprise AI that replaces a manual human role or decision process with a quantifiable efficiency gain (e.g., "48h → 2h", "80% downtime reduction", "replacing manual adjusters"). Clear enterprise ROI. Data moat potential.
+Examples: AI agent for insurance claims processing replacing manual adjusters, radiology AI reducing report turnaround from 48h to 2h, predictive maintenance AI reducing unplanned downtime by 80%, automated underwriting AI replacing manual credit analysts, autonomous code review and security remediation agent for DevSecOps, real-time fraud detection using graph neural networks for payment processors, AI procurement intelligence platform replacing manual RFP workflows for Fortune 500, drug discovery platform using LLMs to replace manual literature review and compound screening, LLM cost monitoring for enterprise Kubernetes clusters, cybersecurity posture management with AI auto-remediation
+
+TIER 5 (survival_chance 61–80, verdict CONDITIONAL INTEREST):
+Platform or infrastructure play that replaces an ENTIRE legacy software category. AI-native full-stack system. Novel data combination no incumbent has.
+Examples: AI-native ERP replacing SAP for manufacturing SMBs, supply chain risk platform combining satellite data + LLMs for enterprise procurement
+
+TIER 6 (survival_chance 81–100, verdict CONDITIONAL INTEREST):
+Truly novel — creates a new market category, deep technical moat, no real competition yet. Extremely rare. Use this only for genuinely unprecedented ideas.
+
+CLASSIFICATION RULES (apply in order):
+1. If it is a consumer app / "X for Y" clone / NFT / metaverse / social network → TIER 1
+2. If it is B2B but only wraps one thin feature with no workflow → TIER 2
+3. If it owns a complete workflow end-to-end for a specific named industry → TIER 3
+4. If it says "replacing manual [role/decision]" OR cites a specific efficiency metric (hours, %, cost) → TIER 4 minimum
+5. If it replaces an entire legacy software category (ERP, full stack) → TIER 5
+
+Return ONLY valid JSON — no explanation, no markdown:
+{
+  "tier": <integer 1–6>,
+  "survival_chance": <integer within tier range>,
+  "investment_verdict": "LAUGHABLE" | "HARD PASS" | "WEAK MAYBE" | "CONDITIONAL INTEREST",
+  "tier_reason": "<one sentence explaining exactly why this tier>"
+}
+
+STARTUP IDEA: {idea}
+"""
 
 VC_ROAST_PROMPT = """
 YOU ARE "THE SKEPTIC."
 
 ROLE:
-You are a ruthless, cynical Venture Capitalist Partner. You see 100 pitches a day and reject 99. You do not care about feelings; you care about not losing money. You are looking for the "Fatal Flaw."
+You are a ruthless Venture Capitalist Partner. You see 100 pitches a day. You tear ideas apart — but you back it up with real data, real competitor names, real numbers.
+
+PRE-DETERMINED CLASSIFICATION — DO NOT CHANGE THESE VALUES:
+  Tier:               {tier}
+  survival_chance:    {survival_chance}   ← OUTPUT THIS EXACT INTEGER. DO NOT CHANGE IT.
+  investment_verdict: {verdict}           ← OUTPUT THIS EXACT STRING. DO NOT CHANGE IT.
+  Classification:     {tier_reason}
+
+Your only job is to write the brutal analysis. The numbers are already decided by a classifier. You are the writer, not the judge.
 
 INPUT:
 A user's startup idea description.
 
-TASK:
-Tear the idea apart. Ignore the "good parts." Focus exclusively on why this will fail.
-
 ANALYSIS FRAMEWORK:
-1. DIFFERENTIATION: Is this just a feature of a bigger product? (e.g., "Google will build this in a week.")
-2. ECONOMICS: Does the math work? (CAC > LTV? Low margins? Impossible scale?)
-3. DISTRIBUTION: How will they get users without spending millions on ads?
-4. REALITY: Is this a "solution looking for a problem"?
+1. DIFFERENTIATION: Does it have a defensible moat or is it a feature an incumbent builds in a week?
+2. ECONOMICS: CAC vs LTV, margins, burn rate — does the math work?
+3. DISTRIBUTION: How do they acquire customers without burning millions?
+4. REALITY: Is this a real problem or a solution looking for one?
+5. TIMING: Too early, too late, or right timing but wrong team?
+
+MANDATORY SURVIVAL CHANCE RULES — YOU MUST FOLLOW THESE EXACTLY:
+
+TIER 1 — 1–8%: Consumer app with massive incumbents. "Uber for X" clones. NFT/crypto in dead markets. Social networks for niches. No real B2B revenue model.
+  → Examples that MUST score here: dog walking app, parking Airbnb, pet social network, NFT marketplace, crypto payment gateway for SMBs, co-founder Tinder clone, food delivery for campuses
+
+TIER 2 — 9–20%: Real B2B problem BUT the idea is a SINGLE THIN FEATURE with no workflow ownership, no proprietary data, and incumbents actively shipping the same feature natively. Must have no end-to-end workflow.
+  → Examples that MUST score here: generic AI chatbot for any industry, basic CRM add-on, generic analytics dashboard, D2C supplement brand
+  → DOES NOT include: any idea that owns a complete workflow end-to-end for a specific vertical industry
+
+TIER 3 — 21–40%: Vertical SaaS that OWNS a specific end-to-end workflow for a named industry. Real measurable pain point. Funded rivals exist but the workflow niche is defensible.
+  → Examples that MUST score here: HIPAA compliance SaaS for mid-size hospitals, auto repair shop inventory/billing SaaS, AI contract risk scanner for Fortune 500 legal teams, B2B procurement automation for mid-market manufacturers, no-code internal tool builder for logistics ops, churn analytics platform for B2B SaaS, lease abstraction SaaS for commercial real estate, practice management SaaS for vet clinics, permit/inspection workflow SaaS for construction, fleet maintenance and DOT compliance SaaS for trucking, menu cost optimization SaaS for restaurant chains, regulatory compliance SaaS for community banks
+  → KEY RULE: If it targets a specific industry + owns multiple steps of a workflow (scheduling, billing, compliance, reporting) = TIER 3, even if the market is fragmented or budgets are small.
+
+TIER 4 — 41–60%: Enterprise AI replacing a manual human role or decision process with quantifiable efficiency gain (e.g., "48h → 2h", "80% downtime reduction", "replacing manual adjusters"). Clear ROI. Data moat potential. Distinct enterprise ICP.
+  → Examples that MUST score here: AI agent for insurance claims processing replacing manual adjusters, LLM cost monitoring for enterprise Kubernetes clusters, cybersecurity posture management with AI auto-remediation, radiology report AI reducing turnaround from 48h to 2h, automated underwriting AI replacing manual credit analysts, autonomous code review and security remediation agent, predictive maintenance AI reducing downtime 80%, fraud detection infrastructure using graph neural networks, AI procurement platform replacing manual RFP workflows for Fortune 500, drug discovery platform using LLMs to replace manual literature review and compound screening
+  → KEY RULE: If the idea says "replacing manual [role/process]" OR cites a specific efficiency gain metric = TIER 4 minimum, regardless of how mature or crowded the market is.
+
+TIER 5 — 61–80%: Platform or infrastructure play. AI-native system replacing entire legacy software category. Novel data combination no incumbent has.
+  → Examples that MUST score here: AI-native ERP replacing SAP for manufacturing SMBs, supply chain risk platform combining satellite data + LLMs for enterprise procurement
+
+TIER 6 — 81–100%: Truly novel — new market category, deep technical moat, no real competition yet. Extremely rare. Do not use this lightly.
+
+CRITICAL RULES — READ BEFORE SCORING:
+1. "Has incumbents" does NOT mean Tier 2. EVERY B2B market has incumbents.
+2. "Fragmented SMB market" does NOT mean Tier 2. Vertical SaaS for fragmented markets = Tier 3.
+3. "Market is mature" does NOT mean Tier 2. Enterprise AI replacing manual human work in a mature market = Tier 4.
+4. If you are about to score something 9–20%, ask yourself: does this idea own an end-to-end workflow, or is it literally just one thin feature? If it owns a workflow → Tier 3 minimum.
 
 OUTPUT FORMAT:
-Return ONLY valid JSON with this structure:
-{
-  "kill_shot": "The single most devastating reason this fails in one sentence.",
+Return ONLY valid JSON — no markdown, no explanation:
+{{
+  "kill_shot": "The single most devastating reason this fails in one sentence. Name real competitors or market dynamics.",
   "brutal_feedback": [
-    "Point 1: Specific criticism about the market or model.",
-    "Point 2: Specific criticism about the tech or implementation.",
-    "Point 3: Specific criticism about the competition."
+    "Specific criticism about market size or economics — include real numbers.",
+    "Specific criticism about tech or implementation complexity.",
+    "Specific criticism about competition — name the actual incumbent and why they win.",
+    "Specific criticism about distribution or customer acquisition cost.",
+    "Specific criticism about timing, team fit, or regulatory risk."
   ],
-  "competitor_alert": "Name of the incumbent that will crush them (e.g., Google, Uber, Amazon) and why.",
-  "investment_verdict": "HARD PASS" or "WEAK MAYBE" or "LAUGHABLE",
-  "survival_chance": Integer between 0 and 100
-}
+  "competitor_alert": "Name the exact incumbent and the specific reason they win (data moat, distribution, brand, or pricing).",
+  "investment_verdict": "{verdict}",
+  "survival_chance": {survival_chance},
+  "survival_benchmark": "One sentence with real sector survival data for context."
+}}
 
 TONE RULES:
-- Be sarcastic, direct, and short.
-- No fluff. No compliments.
-- Use words like: "Burn rate," "Churn," "Zero-sum," "Acqui-hire," "Vaporware."
+- Brutal but accurate. Match the tone to the tier — harsher for Tier 1, more analytical for Tier 4+.
+- Short, punchy sentences. No fluff.
+- Use: "Burn rate," "Churn," "Zero-sum," "Acqui-hire," "Vaporware," "Commoditized."
+- Reference real companies, real funding rounds, real market events.
 """
+
+# Tier → survival_chance midpoint fallback if classifier fails
+_TIER_FALLBACK_CHANCE = {1: 4, 2: 14, 3: 30, 4: 50, 5: 70, 6: 85}
+_TIER_FALLBACK_VERDICT = {
+    1: "LAUGHABLE", 2: "HARD PASS", 3: "WEAK MAYBE",
+    4: "CONDITIONAL INTEREST", 5: "CONDITIONAL INTEREST", 6: "CONDITIONAL INTEREST"
+}
+
+async def _classify_idea(idea: str) -> dict:
+    """Step 1 — classify tier, lock survival_chance + verdict before roasting."""
+    classifier_prompt = VC_ROAST_CLASSIFIER_PROMPT.replace("{idea}", idea)
+    raw = await asyncio.to_thread(call_gemini, classifier_prompt, SECONDARY_MODEL, _next_gemini_offset())
+    result = clean_json(raw)
+    if result and "tier" in result and "survival_chance" in result and "investment_verdict" in result:
+        print(f"[SKEPTIC] Classifier → Tier {result['tier']} | {result['survival_chance']}% | {result['investment_verdict']}")
+        return result
+    # Fallback: NIM classifier if Gemini fails
+    raw = await asyncio.to_thread(call_nim, classifier_prompt, NIM_MODEL_ROAST, _next_nim_offset())
+    result = clean_json(raw)
+    if result and "tier" in result:
+        return result
+    # Hard fallback: Tier 2 (most conservative safe default)
+    print(f"[SKEPTIC] Classifier failed — using Tier 2 hard fallback")
+    return {"tier": 2, "survival_chance": 14, "investment_verdict": "HARD PASS", "tier_reason": "Classification unavailable."}
 
 @app.post("/vc_roast")
 async def vc_roast(request: VCRoastRequest):
     user_idea = request.user_idea
     print(f"\n[SKEPTIC] VC ROASTING: {user_idea}")
 
+    # Run web search and classification in parallel
+    search_task = asyncio.create_task(asyncio.to_thread(search_web, user_idea, "competitor"))
+    classify_task = asyncio.create_task(_classify_idea(user_idea))
+
     try:
-        comp_context, _, _ = await asyncio.to_thread(search_web, user_idea, "competitor")
+        comp_context, _, _ = await search_task
     except Exception:
         comp_context = ""
 
+    classification = await classify_task
+    tier = classification.get("tier", 2)
+    survival_chance = classification.get("survival_chance", _TIER_FALLBACK_CHANCE.get(tier, 14))
+    verdict = classification.get("investment_verdict", _TIER_FALLBACK_VERDICT.get(tier, "HARD PASS"))
+    tier_reason = classification.get("tier_reason", "")
+
+    # Build roast prompt with locked values injected
+    roast_prompt = VC_ROAST_PROMPT.format(
+        tier=tier,
+        survival_chance=survival_chance,
+        verdict=verdict,
+        tier_reason=tier_reason
+    )
     grounding = f"\nLIVE MARKET INTEL (from web search):\n{comp_context}\n" if comp_context else ""
-    full_prompt = f"{VC_ROAST_PROMPT}{grounding}\nTARGET IDEA: {user_idea}"
+    full_prompt = f"{roast_prompt}{grounding}\nTARGET IDEA: {user_idea}"
 
     try:
-        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, _next_nim_offset())
+        # PRIMARY: Gemini 2.5 Flash — best reasoning for writing brutal analysis
+        print(f"[SKEPTIC] Roasting with Flash (Tier {tier}, {survival_chance}%, {verdict})...")
+        raw = await asyncio.to_thread(call_gemini, full_prompt, None, _next_gemini_offset())
         data = clean_json(raw)
-        if not data: raise ValueError("Roast failed.")
+        if not data:
+            # FALLBACK 1: Gemini 2.5 Flash-Lite
+            print(f"[SKEPTIC] Flash failed — trying Flash-Lite fallback...")
+            raw = await asyncio.to_thread(call_gemini, full_prompt, SECONDARY_MODEL, _next_gemini_offset())
+            data = clean_json(raw)
+        if not data:
+            # FALLBACK 2: NIM — independent keys, true safety net
+            print(f"[SKEPTIC] Flash-Lite failed — falling back to NIM (independent keys)...")
+            raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, _next_nim_offset())
+            data = clean_json(raw)
+        if not data:
+            raise ValueError("Roast failed — Gemini Flash, Flash-Lite, and NIM all returned empty.")
+
+        # Safety net: always enforce classifier values regardless of what the roaster outputs
+        data["survival_chance"] = survival_chance
+        data["investment_verdict"] = verdict
         return data
+
     except Exception as e:
         print(f"[SKEPTIC] ROAST FAILURE: {e}")
         return {
-            "kill_shot": "Your backend crashed, just like this startup will.",
-            "brutal_feedback": ["Server Timeout: Even the AI refused to analyze this.", "Technical Debt: You handled this error poorly.", "Market Fit: Zero."],
-            "competitor_alert": "Competent Engineers.",
-            "investment_verdict": "HARD PASS",
-            "survival_chance": 0
+            "kill_shot": "Your backend timed out — even the AI couldn't find a reason to care about this idea.",
+            "brutal_feedback": [
+                "Market: No live data available — couldn't verify if a real market exists.",
+                "Economics: If the model can't load, the unit economics probably don't work either.",
+                "Competition: Unknown incumbents will crush this before it finds product-market fit.",
+                "Distribution: Getting users is harder than getting this server to respond.",
+                "Timing: Too slow on the pitch, too slow on the product."
+            ],
+            "competitor_alert": "Every well-funded incumbent in this space has better infrastructure than this backend.",
+            "investment_verdict": verdict,
+            "survival_chance": survival_chance,
+            "survival_benchmark": "5% survival rate — same odds as a backend that can't stay online."
         }
 
 # ============================================================================
@@ -1695,7 +1847,14 @@ async def pitch_forge(request: PitchForgeRequest):
     user_idea = request.user_idea
     print(f"\n[FORGE] PITCH FORGING: {user_idea}")
 
+    # Web search grounding — pull live market/competitor context to make pitch credible
+    try:
+        comp_context, _, _ = await asyncio.to_thread(search_web, user_idea, "market")
+    except Exception:
+        comp_context = ""
+
     market_ctx = ""
+    # Prefer Validator cache data if passed; fall back to web search
     if request.market_size or request.growth_rate or request.top_competitor:
         market_ctx = f"""
 MARKET CONTEXT (inject these facts into the pitch to make it credible):
@@ -1704,12 +1863,31 @@ MARKET CONTEXT (inject these facts into the pitch to make it credible):
 - Top Competitor to Position Against: {request.top_competitor or 'Unknown'}
 USE these numbers in the elevator_pitch and value_proposition where natural.
 """
+    elif comp_context:
+        market_ctx = f"""
+LIVE MARKET INTEL (from web search — use these facts to make the pitch credible):
+{comp_context}
+Reference real market sizes, growth rates, or competitor names where natural.
+"""
+
     full_prompt = f"{PITCH_FORGE_PROMPT}{market_ctx}\nTARGET IDEA: {user_idea}"
     
     try:
-        raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_FORGE, _next_nim_offset())
+        # PRIMARY: Gemini 2.5 Flash — best pitch language, investor-grade narrative
+        print(f"[FORGE] Trying Gemini 2.5 Flash primary...")
+        raw = await asyncio.to_thread(call_gemini, full_prompt, None, _next_gemini_offset())
         data = clean_json(raw)
-        if not data: raise ValueError("Pitch Forge failed.")
+        if not data:
+            # FALLBACK 1: Gemini 2.5 Flash-Lite — same family, still quality pitch output
+            print(f"[FORGE] Flash failed — trying Flash-Lite fallback...")
+            raw = await asyncio.to_thread(call_gemini, full_prompt, SECONDARY_MODEL, _next_gemini_offset())
+            data = clean_json(raw)
+        if not data:
+            # FALLBACK 2: NIM — independent keys, true safety net when Gemini quota exhausted
+            print(f"[FORGE] Flash-Lite failed — falling back to NIM (independent keys)...")
+            raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_FORGE, _next_nim_offset())
+            data = clean_json(raw)
+        if not data: raise ValueError("Pitch Forge failed — Gemini Flash, Flash-Lite, and NIM all returned empty.")
         return data
     except Exception as e:
         print(f"[FORGE] FORGE FAILURE: {e}")
