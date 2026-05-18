@@ -1,6 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import api from '../../services/api';
-import { jsPDF } from 'jspdf';
 import {
     ChevronRight, TrendingUp, Users, Scale, Hammer,
     Megaphone, Briefcase, Rocket, Search, Clock,
@@ -326,113 +325,437 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
 
     const reportRef = useRef<HTMLDivElement>(null);
 
-    const generatePDF = () => {
+    const generateHTML = () => {
         if (!data) return;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const W = 210; const M = 14; const TW = W - M * 2;
-        let y = 0;
 
-        const addPage = () => { pdf.addPage(); y = 16; };
-        const checkY = (needed = 10) => { if (y + needed > 280) addPage(); };
+        // ── HTML helpers ───────────────────────────────────────────────────
+        const esc = (s: any): string => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        const nfv = (x: any) => !x || isNF(String(x));
+        const KV = (label: string, x: any) => nfv(x) ? '' : `<div class="kv"><span class="kl">${esc(label)}</span><span class="kv-v">${esc(String(x))}</span></div>`;
+        const P  = (t: any) => nfv(t) ? '' : `<p>${esc(String(t))}</p>`;
+        const H2 = (t: string, color = '') => `<h2${color ? ` style="color:${color}"` : ''}>${esc(t)}</h2>`;
+        const H3 = (t: string) => `<h3>${esc(t)}</h3>`;
+        const UL = (items: any[], fn?: (i: any) => string) => !items?.length ? '' : `<ul>${items.map(i => `<li>${fn ? fn(i) : esc(String(i))}</li>`).join('')}</ul>`;
+        const SEV = (s: string) => { const su = String(s || '').toUpperCase(); const c: Record<string,string> = {HIGH:'#ef4444',CRITICAL:'#dc2626',MEDIUM:'#f59e0b',LOW:'#10b981'}; return `<span class="badge" style="background:${c[su] || '#64748b'}">${su}</span>`; };
+        const SEC = (title: string, color: string, content: string) => !content.trim() ? '' : `<section><h1 class="sec-title" style="color:${color};border-left-color:${color}">${esc(title)}</h1>${content}</section>`;
+        const LNK = (url: string, label?: string) => url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label || url)}</a>` : '';
+        const HR  = () => '<hr>';
 
-        const h1 = (txt: string, color: [number, number, number] = [15, 23, 42]) => {
-            checkY(12);
-            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.setTextColor(...color);
-            pdf.text(txt, M, y); y += 10;
-        };
-        const h2 = (txt: string) => {
-            checkY(9);
-            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(12); pdf.setTextColor(30, 41, 59);
-            pdf.text(txt, M, y); y += 7;
-        };
-        const body = (txt: string, indent = 0) => {
-            checkY(6);
-            pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(71, 85, 105);
-            const lines = pdf.splitTextToSize(txt, TW - indent);
-            pdf.text(lines, M + indent, y);
-            y += lines.length * 5 + 1;
-        };
-        const kv = (label: string, val: string) => {
-            checkY(6);
-            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59);
-            pdf.text(`${label}:`, M, y);
-            pdf.setFont('helvetica', 'normal'); pdf.setTextColor(71, 85, 105);
-            pdf.text(isNF(val) ? '—' : val, M + 30, y);
-            y += 6;
-        };
-        const divider = () => {
-            checkY(4);
-            pdf.setDrawColor(226, 232, 240); pdf.line(M, y, W - M, y); y += 5;
-        };
-        const badge = (txt: string, r: number, g: number, b: number) => {
-            checkY(8);
-            pdf.setFillColor(r, g, b); pdf.roundedRect(M, y - 4, 40, 7, 2, 2, 'F');
-            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(255, 255, 255);
-            pdf.text(txt, M + 2, y); y += 8;
-        };
+        let html = '';
 
-        // ── COVER ──────────────────────────────────────────────────────────
-        pdf.setFillColor(2, 6, 23); pdf.rect(0, 0, 210, 297, 'F');
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(100, 200, 140);
-        pdf.text('LAUNCHMINT INTELLIGENCE BRIEF', M, 30);
-        pdf.setFontSize(26); pdf.setTextColor(255, 255, 255);
-        const titleLines = pdf.splitTextToSize(input.toUpperCase(), TW);
-        pdf.text(titleLines, M, 50);
-        pdf.setFontSize(9); pdf.setTextColor(100, 116, 139);
-        pdf.text(`Generated: ${new Date().toLocaleDateString()}  |  Classification: CONFIDENTIAL`, M, 280);
-        addPage();
+        // ── I. Strategic Verdict ───────────────────────────────────────────
+        const gm = data.god_mode as any;
+        if (gm) html += SEC('I. Strategic Verdict', '#10b981', `
+            ${gm.macro_verdict ? `<blockquote>"${esc(gm.macro_verdict)}"</blockquote>` : ''}
+            ${P(gm.swarm_summary)}
+            ${KV('Risk Score', gm.risk_score)}
+            ${gm.pivot_warning ? H3('Pivot Warning') + P(gm.pivot_warning) : ''}
+        `);
 
-        // ── 1. VERDICT ─────────────────────────────────────────────────────
-        h1('I. FINAL STRATEGIC VERDICT', [16, 185, 129]);
-        divider();
-        if (data.god_mode) {
-            body(`"${data.god_mode.macro_verdict}"`);
-            y += 2;
-            body(data.god_mode.swarm_summary || '');
-            y += 3;
-            kv('Risk Level', data.god_mode.risk_score || '—');
+        // ── II. Market Intelligence ────────────────────────────────────────
+        const mkt = data.market as any;
+        if (mkt) html += SEC('II. Market Intelligence', '#0ea5e9', `
+            ${KV('Current TAM', mkt.current_tam)}
+            ${KV('Forecast TAM', mkt.forecast_tam ? `${mkt.forecast_tam} (${mkt.forecast_year || '2030'})` : null)}
+            ${KV('Growth (CAGR)', mkt.growth)}
+            ${KV('Revenue Model', mkt.revenue_model)}
+            ${KV('Confidence', mkt.confidence)}
+            ${KV('Source', mkt.source_name)}
+            ${mkt.timing?.label ? H3('Market Timing') + KV('Signal', mkt.timing.label) + P(mkt.timing.rationale) : ''}
+        `);
+
+        // ── III. Survival & Risk Analysis ──────────────────────────────────
+        if (dsData) {
+            const sv  = (dsData as any).survival  as any;
+            const fin = (dsData as any).financials as any;
+            const cb  = sv?.confidence_band;
+            html += SEC('III. Survival & Risk Analysis', '#8b5cf6', `
+                ${KV('Survival Probability', sv?.survival_probability != null ? `${Math.round(sv.survival_probability * 100)}%` : null)}
+                ${KV('Risk Tier', sv?.risk_tier)}
+                ${cb?.length === 2 ? KV('Confidence Band', `${Math.round(cb[0]*100)}% – ${Math.round(cb[1]*100)}%`) : ''}
+                ${sv?.top_risk_factors?.length ? H3('Risk Factors') + UL(sv.top_risk_factors) : ''}
+                ${sv?.similar_winners?.length ? H3('Similar Winners') + UL(sv.similar_winners) : ''}
+                ${sv?.similar_losers?.length  ? H3('Similar Losers')  + UL(sv.similar_losers)  : ''}
+                ${fin?.base?.runway_months ? KV('Monte Carlo Runway (Base)', `${fin.base.runway_months} months`) : ''}
+                ${fin?.bear?.runway_months ? KV('Monte Carlo Runway (Bear)', `${fin.bear.runway_months} months`) : ''}
+                ${fin?.breakeven_probability != null ? KV('Breakeven Probability', `${Math.round(fin.breakeven_probability * 100)}%`) : ''}
+            `);
         }
-        y += 6; divider();
 
-        // ── 2. MARKET INTEL ────────────────────────────────────────────────
-        h1('II. MARKET INTEL');
-        kv('Current TAM', isNF(data.market.current_tam) ? 'Data unavailable' : data.market.current_tam);
-        kv('Forecast TAM', isNF(data.market.forecast_tam) ? 'Data unavailable' : `${data.market.forecast_tam} (${data.market.forecast_year || '2030'})`);
-        kv('Growth (CAGR)', isNF(data.market.growth) ? 'Data unavailable' : data.market.growth);
-        kv('Confidence', data.market.confidence || '—');
-        kv('Source', data.market.source_name || '—');
-        if (data.market.timing?.label) kv('Market Timing', `${data.market.timing.label} — ${data.market.timing.rationale || ''}`);
-        y += 6; divider();
+        // ── IV. Competitor Forensic Dossiers ───────────────────────────────
+        if (data.competitors?.length) {
+            html += SEC('IV. Competitor Forensic Dossiers', '#f87171',
+                (data.competitors as any[]).map((c, i) => `
+                    <div class="comp-card">
+                        <div class="comp-name">${i + 1}. ${esc(c.name)}</div>
+                        ${KV('Funding', c.market_fin?.funding)}
+                        ${KV('Investors', c.market_fin?.investors)}
+                        ${KV('Pricing', c.product_intel?.pricing)}
+                        ${KV('Key Features', Array.isArray(c.product_intel?.features) ? c.product_intel.features.join(', ') : c.product_intel?.features)}
+                        ${KV('Tech Stack', c.technical_infra?.stack)}
+                        ${KV('Fatal Weakness', c.weakness)}
+                        ${c.kill_strategy ? `<div class="kill">${esc(c.kill_strategy)}</div>` : ''}
+                    </div>
+                `).join('')
+            );
+        }
 
-        // ── 3. COMPETITORS ─────────────────────────────────────────────────
-        h1('III. COMPETITOR FORENSIC DOSSIERS');
-        (data.competitors || []).slice(0, 3).forEach((c, i) => {
-            checkY(40);
-            h2(`${i + 1}. ${c.name}`);
-            kv('Funding', c.market_fin?.funding || '—');
-            kv('Pricing', c.product_intel?.pricing || '—');
-            kv('Stack', c.technical_infra?.stack || '—');
-            kv('Fatal Weakness', c.weakness || '—');
-            body(`Kill Strategy: ${c.kill_strategy || '—'}`, 4);
-            y += 4;
-        });
-        divider();
+        // ── V. MVP Blueprint ───────────────────────────────────────────────
+        if (data.gen_ui) {
+            const g = data.gen_ui as any;
+            html += SEC('V. MVP Blueprint', '#fb923c', `
+                ${g.feature ? H3('Core Feature') + P(g.feature) : ''}
+                ${g.desc ? H3('Description') + P(g.desc) : ''}
+            `);
+        }
 
-        // ── 4. EXECUTION PLAN ──────────────────────────────────────────────
-        checkY(20); h1('IV. EXECUTION PLAN');
+        // ── VI. Execution Playbook ─────────────────────────────────────────
         const depts = [
-            { name: 'Legal', items: data.dept_legal || [] },
-            { name: 'Product', items: data.dept_product || [] },
-            { name: 'Marketing', items: data.dept_marketing || [] },
-            { name: 'Finance', items: data.dept_finance || [] },
-        ];
-        depts.forEach(dept => {
-            h2(`${dept.name} Department`);
-            dept.items.slice(0, 5).forEach((item, i) => body(`${i + 1}. ${item}`, 4));
-            y += 3;
-        });
+            { name: 'Legal',     items: (data.dept_legal     || []) as string[] },
+            { name: 'Product',   items: (data.dept_product   || []) as string[] },
+            { name: 'Marketing', items: (data.dept_marketing || []) as string[] },
+            { name: 'Finance',   items: (data.dept_finance   || []) as string[] },
+        ].filter(d => d.items.length);
+        if (depts.length) {
+            html += SEC('VI. Execution Playbook', '#6366f1',
+                depts.map(d => `
+                    <div class="dept-group">
+                        <div class="dept-title">${esc(d.name)}</div>
+                        <ol>${d.items.map(item => `<li>${esc(item)}</li>`).join('')}</ol>
+                    </div>
+                `).join('')
+            );
+        }
 
-        pdf.save(`LaunchMint_${input.replace(/\s+/g, '_')}.pdf`);
+        // ── VII. Competitive Battlefield ───────────────────────────────────
+        if (warData) {
+            const wr = warData as any;
+            let warContent = '';
+            if (wr.god_mode?.macro_verdict) warContent += `<blockquote>"${esc(wr.god_mode.macro_verdict)}"</blockquote>`;
+            if (wr.god_mode?.swarm_summary) warContent += P(wr.god_mode.swarm_summary);
+            if (wr.competitors?.length) {
+                warContent += H3('Competitor Kill Strategies');
+                warContent += (wr.competitors as any[]).map((c: any) => `
+                    <div class="comp-card">
+                        <div class="comp-name">${esc(c.name)}</div>
+                        ${KV('Funding', c.market_fin?.funding)}
+                        ${KV('Pricing', c.product_intel?.pricing)}
+                        ${c.kill_strategy ? `<div class="kill">${esc(c.kill_strategy)}</div>` : ''}
+                    </div>
+                `).join('');
+            }
+            const swot = wr.god_mode?.swot;
+            if (swot) {
+                warContent += H3('SWOT Analysis');
+                warContent += `<div class="swot-grid">${[
+                    { label: 'STRENGTHS',    items: swot.strengths,    color: '#10b981' },
+                    { label: 'WEAKNESSES',   items: swot.weaknesses,   color: '#ef4444' },
+                    { label: 'OPPORTUNITIES',items: swot.opportunities, color: '#0ea5e9' },
+                    { label: 'THREATS',      items: swot.threats,      color: '#f59e0b' },
+                ].map(q => !q.items?.length ? '' : `
+                    <div class="swot-card">
+                        <div class="swot-label" style="color:${q.color}">${q.label}</div>
+                        ${UL(q.items)}
+                    </div>
+                `).join('')}</div>`;
+            }
+            if (warContent) html += SEC('VII. Competitive Battlefield', '#ec4899', warContent);
+        }
+
+        // ── VIII. Deep Intelligence ────────────────────────────────────────
+        if (deepIntel) {
+            let di = '';
+            if (deepIntel.fin) {
+                const f = deepIntel.fin as any;
+                di += H2('Financial Projection', '#10b981');
+                di += KV('Pricing Model', f.assumptions?.pricing_model);
+                di += KV('LTV:CAC Ratio', f.assumptions?.ltv_cac_ratio);
+                di += KV('Gross Margin', f.assumptions?.gross_margin);
+                di += KV('Payback Period', f.assumptions?.payback_period);
+                di += KV('Recommended Round', f.fundraising?.recommended_round);
+                di += KV('Runway', f.fundraising?.runway_months);
+                if (f.projections?.length) {
+                    di += H3('Year-by-Year Projections');
+                    di += (f.projections as any[]).map((p: any) => `
+                        <div class="proj-row">
+                            <span class="proj-year">${esc(String(p.year))}</span>
+                            <span>Revenue: <strong>${esc(p.revenue || '—')}</strong></span>
+                            <span>Users: <strong>${esc(p.users || '—')}</strong></span>
+                            <span>Burn: <strong>${esc(p.burn || '—')}</strong></span>
+                        </div>
+                    `).join('');
+                }
+                if (f.fundraising?.use_of_funds) { di += H3('Use of Funds'); di += P(f.fundraising.use_of_funds); }
+                if (f.verdict) { di += H3('Financial Verdict'); di += P(f.verdict); }
+                di += HR();
+            }
+            if (deepIntel.gtm) {
+                const g = deepIntel.gtm as any;
+                di += H2('Go-to-Market Strategy', '#0ea5e9');
+                di += KV('North Star Metric', g.north_star_metric);
+                di += KV('ICP', g.icp);
+                if (g.channels?.length) {
+                    di += H3('Acquisition Channels');
+                    di += (g.channels as any[]).map((ch: any) => `
+                        <div class="chan-card">
+                            <div style="font-weight:800;color:#f1f5f9;margin-bottom:6px">${esc(ch.name)}${ch.priority ? ` &nbsp;<span class="badge" style="background:#1e293b;color:#94a3b8">${esc(ch.priority)}</span>` : ''}</div>
+                            ${(ch.cac || ch.timeline) ? `<div style="font-size:12px">CAC: ${esc(ch.cac || '—')} &nbsp;·&nbsp; Timeline: ${esc(ch.timeline || '—')}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+                if (g.growth_lever) { di += H3('Growth Lever'); di += P(g.growth_lever); }
+                if (g.first_100_customers) { di += H3('First 100 Customers'); di += P(g.first_100_customers); }
+                di += HR();
+            }
+            if (deepIntel.risk) {
+                const r = deepIntel.risk as any;
+                di += H2('Risk Scanner', '#ef4444');
+                di += KV('Overall Risk', r.overall_risk);
+                if (r.risks?.length) {
+                    di += H3('Risk Register');
+                    di += (r.risks as any[]).map((ri: any) => `
+                        <div class="risk-item">
+                            ${SEV(ri.severity)}
+                            <div style="font-weight:700;color:#f1f5f9;margin-bottom:8px">${esc(ri.title || '')}</div>
+                            ${P(ri.description)}
+                            ${ri.mitigation ? `<div class="mitigation">Mitigation: ${esc(ri.mitigation)}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+                if (r.kill_condition) { di += H3('Kill Condition'); di += P(r.kill_condition); }
+            }
+            if (di) html += SEC('VIII. Deep Intelligence', '#10b981', di);
+        }
+
+        // ── IX. Extended Intelligence ──────────────────────────────────────
+        if (extIntel) {
+            let ex = '';
+            if (extIntel.personas?.personas?.length) {
+                ex += H2('Buyer Personas', '#fb923c');
+                ex += (extIntel.personas.personas as any[]).map((p: any, i: number) => `
+                    <div class="persona-card">
+                        <div class="comp-name">${i + 1}. ${esc(p.name)}${p.role ? ` — ${esc(p.role)}` : ''}</div>
+                        ${KV('Pain Point', p.pain_point)}
+                        ${KV('Goal', p.goal)}
+                        ${KV('Willingness to Pay', p.willingness_to_pay)}
+                        ${KV('Acquisition Channel', p.acquisition_channel)}
+                    </div>
+                `).join('');
+                ex += HR();
+            }
+            if (extIntel.redFlags) {
+                const rf = extIntel.redFlags as any;
+                ex += H2('Red Flags', '#ef4444');
+                if (rf.red_flags?.length) {
+                    ex += (rf.red_flags as any[]).map((f: any) => `
+                        <div class="risk-item">
+                            ${SEV(f.severity)}
+                            <div style="font-weight:700;color:#f1f5f9;margin-bottom:8px">${esc(f.flag || '')}</div>
+                            ${P(f.explanation)}
+                            ${f.fix ? `<div class="mitigation">Fix: ${esc(f.fix)}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+                if (rf.verdict) { ex += H3('Red Flag Verdict'); ex += P(rf.verdict); }
+                ex += HR();
+            }
+            if (extIntel.pricing) {
+                const pr = extIntel.pricing as any;
+                ex += H2('Pricing Intelligence', '#6366f1');
+                ex += KV('Recommended Model', pr.recommended_model);
+                ex += KV('Competitive Position', pr.competitive_comparison);
+                ex += KV('LTV Estimate', pr.ltv_estimate);
+                if (pr.price_points?.length) {
+                    ex += H3('Price Tiers');
+                    ex += `<table class="price-table">${(pr.price_points as any[]).map((pp: any) => `<tr><td class="pt-tier">${esc(pp.tier || '—')}</td><td>${esc(pp.price || '—')}</td></tr>`).join('')}</table>`;
+                }
+                ex += HR();
+            }
+            if (extIntel.funding) {
+                const fu = extIntel.funding as any;
+                ex += H2('Funding Readiness', '#10b981');
+                ex += KV('Readiness Score', fu.readiness_score);
+                ex += KV('Recommended Round', fu.recommended_round);
+                ex += KV('Timeline', fu.timeline);
+                if (fu.strengths?.length) { ex += H3('Strengths'); ex += UL(fu.strengths); }
+                if (fu.gaps?.length) { ex += H3('Gaps to Close'); ex += UL(fu.gaps); }
+                ex += HR();
+            }
+            if (extIntel.legalRisks) {
+                const lr = extIntel.legalRisks as any;
+                ex += H2('Legal Risk Map', '#ef4444');
+                if (lr.risks?.length) {
+                    ex += (lr.risks as any[]).map((r: any) => `
+                        <div class="risk-item">
+                            ${SEV(r.urgency)}
+                            ${KV('Area', r.area)}
+                            ${P(r.requirement)}
+                            ${r.cost_estimate ? `<div style="font-size:12px;color:#64748b;margin-top:6px">Est. Cost: ${esc(r.cost_estimate)}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+                if (lr.biggest_legal_threat) { ex += H3('Biggest Legal Threat'); ex += P(lr.biggest_legal_threat); }
+                ex += HR();
+            }
+            if (extIntel.traction) {
+                const tr = extIntel.traction as any;
+                ex += H2('Traction Roadmap', '#0ea5e9');
+                if (tr.validation_methods?.length) {
+                    ex += H3('Validation Methods');
+                    ex += (tr.validation_methods as any[]).map((vm: any) => `
+                        <div class="chan-card">
+                            <div style="font-weight:800;color:#f1f5f9;margin-bottom:6px">${esc(vm.method || '')}</div>
+                            ${(vm.timeline || vm.cost) ? `<div style="font-size:12px">Timeline: ${esc(vm.timeline || '—')} &nbsp;·&nbsp; Cost: ${esc(vm.cost || '—')}</div>` : ''}
+                            ${vm.success_signal ? `<div style="font-size:12px;color:#10b981;margin-top:4px">Signal: ${esc(vm.success_signal)}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+                if (tr.pre_launch_strategy) { ex += H3('Pre-Launch Strategy'); ex += P(tr.pre_launch_strategy); }
+                ex += HR();
+            }
+            if (extIntel.moat) {
+                const mo = extIntel.moat as any;
+                ex += H2('Competitive Moat', '#10b981');
+                ex += KV('Moat Type', mo.moat_type);
+                ex += KV('Durability', mo.durability);
+                ex += KV('Defensibility Score', mo.defensibility_score);
+                ex += KV('Time to Moat', mo.time_to_moat);
+                if (mo.threats?.length) { ex += H3('Moat Threats'); ex += UL(mo.threats); }
+                ex += HR();
+            }
+            if (extIntel.exit) {
+                const ei = extIntel.exit as any;
+                ex += H2('Exit Scenarios', '#fb923c');
+                ex += KV('Most Likely Exit', ei.most_likely_exit);
+                ex += KV('Timeline', ei.timeline);
+                ex += KV('Valuation Range', ei.valuation_range);
+                if (ei.scenarios?.length) {
+                    ex += H3('Scenarios');
+                    ex += (ei.scenarios as any[]).map((s: any) => `
+                        <div class="comp-card">
+                            <div style="font-weight:800;color:#f1f5f9;margin-bottom:8px">${esc(s.type || s.name || '—')} — ${esc(s.valuation || '—')} <span class="badge" style="background:#1e293b;color:#94a3b8">${esc(s.probability || '')}</span></div>
+                            ${P(s.reasoning || s.description)}
+                        </div>
+                    `).join('');
+                }
+                if (ei.likely_acquirers?.length) {
+                    ex += H3('Likely Acquirers');
+                    ex += UL(ei.likely_acquirers, (a: any) => {
+                        if (typeof a === 'string') return esc(a);
+                        return esc(a?.name || a?.company || a?.acquirer || Object.values(a as object).filter(v => typeof v === 'string').join(' — '));
+                    });
+                }
+                if (ei.value_drivers) {
+                    ex += H3('Value Drivers');
+                    const vd = Array.isArray(ei.value_drivers) ? ei.value_drivers : String(ei.value_drivers).split(',').map((s: string) => s.trim()).filter(Boolean);
+                    ex += UL(vd);
+                }
+                if (ei.exit_blockers) {
+                    ex += H3('Exit Blockers');
+                    const eb = Array.isArray(ei.exit_blockers) ? ei.exit_blockers : String(ei.exit_blockers).split(',').map((s: string) => s.trim()).filter(Boolean);
+                    ex += UL(eb);
+                }
+            }
+            if (ex) html += SEC('IX. Extended Intelligence', '#fb923c', ex);
+        }
+
+        // ── X. Research Grounding ──────────────────────────────────────────
+        const citations = (data as any).citations;
+        if (citations?.length) {
+            html += SEC('X. Research Grounding', '#64748b', `
+                <p>${citations.length} source${citations.length !== 1 ? 's' : ''} cited — click any link to open.</p>
+                ${(citations as any[]).map((c: any, i: number) => `
+                    <div class="cite-item">
+                        <span class="cite-num">${i + 1}.</span>
+                        <span class="cite-title">${esc(c.title || c.url || `Source ${i + 1}`)}</span>
+                        ${c.url ? `<br><span style="margin-left:20px">${LNK(c.url)}</span>` : ''}
+                    </div>
+                `).join('')}
+            `);
+        }
+
+        // ── Assemble & download ────────────────────────────────────────────
+        const css = `
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#020617;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.7}
+.cover{background:linear-gradient(135deg,#020617 0%,#0d1f3c 100%);border-left:6px solid #10b981;padding:64px 56px;min-height:240px}
+.brand{font-size:11px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:#10b981;margin-bottom:28px}
+.idea-title{font-size:40px;font-weight:900;color:#fff;letter-spacing:-.03em;line-height:1.1;margin-bottom:14px}
+.subtitle{font-size:14px;color:#64748b;margin-bottom:5px}
+.date-line{font-size:12px;color:#475569}
+.conf{margin-top:32px;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#1e293b}
+.report{max-width:900px;margin:0 auto;padding:48px 24px}
+section{margin-bottom:36px;background:#0f172a;border:1px solid #1e293b;border-radius:18px;padding:32px;overflow:hidden}
+.sec-title{font-size:18px;font-weight:900;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid #1e293b;text-transform:uppercase;letter-spacing:.06em;border-left:4px solid;padding-left:14px}
+h2{font-size:14px;font-weight:800;color:#e2e8f0;margin:22px 0 12px}
+h3{font-size:10px;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:.18em;margin:18px 0 10px}
+p{font-size:13px;color:#94a3b8;margin-bottom:12px;line-height:1.65}
+blockquote{border-left:3px solid #10b981;padding:14px 18px;background:rgba(16,185,129,.07);border-radius:0 10px 10px 0;font-style:italic;color:#6ee7b7;margin-bottom:18px;font-size:14px;line-height:1.6}
+.kv{display:flex;gap:16px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;align-items:flex-start}
+.kl{font-weight:700;color:#475569;min-width:160px;flex-shrink:0}
+.kv-v{color:#cbd5e1}
+ul{margin:8px 0 14px 20px}
+ol{margin:8px 0 14px 20px}
+li{font-size:13px;color:#94a3b8;margin-bottom:7px;line-height:1.5}
+hr{border:none;border-top:1px solid #1e293b;margin:22px 0}
+a{color:#22d3ee;text-decoration:none}
+a:hover{text-decoration:underline}
+.badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:800;color:#fff;letter-spacing:.08em;text-transform:uppercase;margin-right:6px;vertical-align:middle}
+.comp-card{background:#0a1628;border:1px solid #1e293b;border-radius:12px;padding:20px;margin-bottom:14px}
+.comp-name{font-size:15px;font-weight:800;color:#f1f5f9;margin-bottom:14px}
+.kill{background:rgba(16,185,129,.07);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#6ee7b7;margin-top:14px;line-height:1.5}
+.dept-group{margin-bottom:20px}
+.dept-title{font-size:12px;font-weight:800;color:#f1f5f9;margin-bottom:10px;padding:5px 12px;background:#1e293b;border-radius:6px;display:inline-block;letter-spacing:.05em}
+.persona-card{background:#0a1628;border:1px solid #1e293b;border-radius:12px;padding:18px;margin-bottom:12px}
+.chan-card{background:#0a1628;border:1px solid #1e293b;border-radius:8px;padding:14px;margin-bottom:10px;font-size:13px;color:#94a3b8}
+.risk-item{background:#0a1628;border:1px solid #1e293b;border-radius:10px;padding:16px;margin-bottom:12px}
+.mitigation{font-size:12px;color:#10b981;font-style:italic;margin-top:10px;line-height:1.5}
+.cite-item{padding:12px 0;border-bottom:1px solid #1e293b;font-size:13px;line-height:1.7}
+.cite-num{font-weight:800;color:#334155;margin-right:6px}
+.cite-title{color:#94a3b8}
+.price-table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+.price-table tr{border-bottom:1px solid #1e293b}
+.price-table td{padding:8px 12px;color:#94a3b8}
+.pt-tier{font-weight:700;color:#e2e8f0;width:150px}
+.swot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.swot-card{background:#0a1628;border-radius:10px;padding:16px;border:1px solid #1e293b}
+.swot-label{font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;margin-bottom:10px}
+.proj-row{display:flex;flex-wrap:wrap;gap:20px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;color:#94a3b8;align-items:center}
+.proj-year{font-weight:800;color:#f1f5f9;min-width:70px}
+.proj-row strong{color:#e2e8f0}
+@media(max-width:640px){.swot-grid{grid-template-columns:1fr}.kl{min-width:110px}.idea-title{font-size:28px}.cover{padding:40px 24px}}
+@media print{body,section{background:#fff!important;color:#1e293b!important}.cover{background:#f8fafc!important}.comp-card,.risk-item,.chan-card,.persona-card,.swot-card{background:#f8fafc!important;border-color:#e2e8f0!important}.kl{color:#374151!important}.kv-v,.cite-title,p,li{color:#4b5563!important}a{color:#0284c7!important}blockquote{background:#f0fdf4!important;color:#166534!important}}
+        `.trim();
+
+        const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LaunchMint AI — ${esc(input)}</title>
+<style>${css}</style>
+</head>
+<body>
+<div class="cover">
+  <div class="brand">LAUNCHMINT AI · INTELLIGENCE BRIEF</div>
+  <h1 class="idea-title">${esc(input.toUpperCase())}</h1>
+  <p class="subtitle">Full intelligence report — all sections expanded</p>
+  <p class="date-line">Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+  <p class="conf">CONFIDENTIAL — FOR INTERNAL USE ONLY</p>
+</div>
+<div class="report">
+${html}
+</div>
+</body>
+</html>`;
+
+        const blob = new Blob([fullHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `LaunchMint_${input.replace(/\s+/g, '_')}.html`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
 
     const runAnalysis = async (text?: string) => {
@@ -541,46 +864,61 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                 const mktSize = resultData.market?.forecast_tam || 'Unknown';
                 const growth = resultData.market?.growth || 'Unknown';
                 const extPayload = { idea: cleanedText, market_size: mktSize, growth_rate: growth };
-                const deepTimeout = { timeout: 90000 };
+                const deepTimeout = { timeout: 180000 };
                 Promise.allSettled([
                     api.post('/run', { extension_id: 'financial-projection', payload: extPayload }, deepTimeout),
                     api.post('/run', { extension_id: 'gtm-strategy', payload: extPayload }, deepTimeout),
                     api.post('/run', { extension_id: 'risk-scanner', payload: extPayload }, deepTimeout),
                 ]).then(([finRes, gtmRes, riskRes]) => {
                     const deepIntelResult = {
-                        fin: finRes.status === 'fulfilled' ? { ...(finRes.value.data?.data || {}), _meta: { provenance_level: finRes.value.data?.provenance_level, evidence_used: finRes.value.data?.evidence_used, error_reason: finRes.value.data?.error_reason } } : null,
-                        gtm: gtmRes.status === 'fulfilled' ? { ...(gtmRes.value.data?.data || {}), _meta: { provenance_level: gtmRes.value.data?.provenance_level, evidence_used: gtmRes.value.data?.evidence_used, error_reason: gtmRes.value.data?.error_reason } } : null,
-                        risk: riskRes.status === 'fulfilled' ? { ...(riskRes.value.data?.data || {}), _meta: { provenance_level: riskRes.value.data?.provenance_level, evidence_used: riskRes.value.data?.evidence_used, error_reason: riskRes.value.data?.error_reason } } : null,
+                        fin: finRes.status === 'fulfilled' ? { ...(finRes.value.data?.data || {}), _meta: { provenance_level: finRes.value.data?.provenance_level, evidence_used: finRes.value.data?.evidence_used, error_reason: finRes.value.data?.error_reason } } : { _failed: true },
+                        gtm: gtmRes.status === 'fulfilled' ? { ...(gtmRes.value.data?.data || {}), _meta: { provenance_level: gtmRes.value.data?.provenance_level, evidence_used: gtmRes.value.data?.evidence_used, error_reason: gtmRes.value.data?.error_reason } } : { _failed: true },
+                        risk: riskRes.status === 'fulfilled' ? { ...(riskRes.value.data?.data || {}), _meta: { provenance_level: riskRes.value.data?.provenance_level, evidence_used: riskRes.value.data?.evidence_used, error_reason: riskRes.value.data?.error_reason } } : { _failed: true },
                     };
                     setDeepIntel(deepIntelResult);
                     setCachedResult(cleanedText, resultData, resultDsData, resultWarData, deepIntelResult, null);
                 }).finally(() => setDeepIntelLoading(false));
 
-                // Fire extended intel in background — non-blocking (8 sections)
+                // Fire extended intel in two sequential batches to prevent Gemini queue saturation.
+                // Batch 1 (5 sections) fires immediately; Batch 2 (3 sections) fires after Batch 1 completes.
                 setExtIntelLoading(true);
-                const extTimeout = { timeout: 90000 };
+                const extTimeout = { timeout: 180000 };
+                const extTimeout2 = { timeout: 180000 };
+                const mkMeta = (r: any) => ({ provenance_level: r?.provenance_level, evidence_used: r?.evidence_used, error_reason: r?.error_reason });
+                const mkFailed = () => ({ _failed: true });
+
                 Promise.allSettled([
                     api.post('/run', { extension_id: 'user-persona', payload: { idea: cleanedText } }, extTimeout),
                     api.post('/run', { extension_id: 'people-analysis', payload: { idea: cleanedText } }, extTimeout),
                     api.post('/run', { extension_id: 'pricing-strategy', payload: extPayload }, extTimeout),
                     api.post('/run', { extension_id: 'funding-readiness', payload: extPayload }, extTimeout),
                     api.post('/run', { extension_id: 'legal-risks', payload: { idea: cleanedText } }, extTimeout),
-                    api.post('/run', { extension_id: 'traction-signals', payload: { idea: cleanedText } }, extTimeout),
-                    api.post('/run', { extension_id: 'moat-analysis', payload: { idea: cleanedText } }, extTimeout),
-                    api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }, extTimeout),
-                ]).then(([personaRes, redFlagRes, pricingRes, fundingRes, legalRes, tractionRes, moatRes, exitRes]) => {
-                    const extIntelResult = {
-                        personas: personaRes.status === 'fulfilled' ? { ...(personaRes.value.data?.data || {}), _meta: { provenance_level: personaRes.value.data?.provenance_level, evidence_used: personaRes.value.data?.evidence_used, error_reason: personaRes.value.data?.error_reason } } : null,
-                        redFlags: redFlagRes.status === 'fulfilled' ? { ...(redFlagRes.value.data?.data || {}), _meta: { provenance_level: redFlagRes.value.data?.provenance_level, evidence_used: redFlagRes.value.data?.evidence_used, error_reason: redFlagRes.value.data?.error_reason } } : null,
-                        pricing: pricingRes.status === 'fulfilled' ? { ...(pricingRes.value.data?.data || {}), _meta: { provenance_level: pricingRes.value.data?.provenance_level, evidence_used: pricingRes.value.data?.evidence_used, error_reason: pricingRes.value.data?.error_reason } } : null,
-                        funding: fundingRes.status === 'fulfilled' ? { ...(fundingRes.value.data?.data || {}), _meta: { provenance_level: fundingRes.value.data?.provenance_level, evidence_used: fundingRes.value.data?.evidence_used, error_reason: fundingRes.value.data?.error_reason } } : null,
-                        legalRisks: legalRes.status === 'fulfilled' ? { ...(legalRes.value.data?.data || {}), _meta: { provenance_level: legalRes.value.data?.provenance_level, evidence_used: legalRes.value.data?.evidence_used, error_reason: legalRes.value.data?.error_reason } } : null,
-                        traction: tractionRes.status === 'fulfilled' ? { ...(tractionRes.value.data?.data || {}), _meta: { provenance_level: tractionRes.value.data?.provenance_level, evidence_used: tractionRes.value.data?.evidence_used, error_reason: tractionRes.value.data?.error_reason } } : null,
-                        moat: moatRes.status === 'fulfilled' ? { ...(moatRes.value.data?.data || {}), _meta: { provenance_level: moatRes.value.data?.provenance_level, evidence_used: moatRes.value.data?.evidence_used, error_reason: moatRes.value.data?.error_reason } } : null,
-                        exit: exitRes.status === 'fulfilled' ? { ...(exitRes.value.data?.data || {}), _meta: { provenance_level: exitRes.value.data?.provenance_level, evidence_used: exitRes.value.data?.evidence_used, error_reason: exitRes.value.data?.error_reason } } : null,
+                ]).then(([personaRes, redFlagRes, pricingRes, fundingRes, legalRes]) => {
+                    const batch1 = {
+                        personas: personaRes.status === 'fulfilled' ? { ...(personaRes.value.data?.data || {}), _meta: mkMeta(personaRes.value.data) } : mkFailed(),
+                        redFlags: redFlagRes.status === 'fulfilled' ? { ...(redFlagRes.value.data?.data || {}), _meta: mkMeta(redFlagRes.value.data) } : mkFailed(),
+                        pricing: pricingRes.status === 'fulfilled' ? { ...(pricingRes.value.data?.data || {}), _meta: mkMeta(pricingRes.value.data) } : mkFailed(),
+                        funding: fundingRes.status === 'fulfilled' ? { ...(fundingRes.value.data?.data || {}), _meta: mkMeta(fundingRes.value.data) } : mkFailed(),
+                        legalRisks: legalRes.status === 'fulfilled' ? { ...(legalRes.value.data?.data || {}), _meta: mkMeta(legalRes.value.data) } : mkFailed(),
+                        traction: null, moat: null, exit: null,
                     };
-                    setExtIntel(extIntelResult);
-                    setCachedResult(cleanedText, resultData, resultDsData, resultWarData, null, extIntelResult);
+                    setExtIntel(batch1);
+
+                    // Batch 2 fires after Batch 1 is done — Gemini queue is now clear
+                    return Promise.allSettled([
+                        api.post('/run', { extension_id: 'traction-signals', payload: { idea: cleanedText } }, extTimeout2),
+                        api.post('/run', { extension_id: 'moat-analysis', payload: { idea: cleanedText } }, extTimeout2),
+                        api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }, extTimeout2),
+                    ]).then(([tractionRes, moatRes, exitRes]) => {
+                        const extIntelResult = {
+                            ...batch1,
+                            traction: tractionRes.status === 'fulfilled' ? { ...(tractionRes.value.data?.data || {}), _meta: mkMeta(tractionRes.value.data) } : mkFailed(),
+                            moat: moatRes.status === 'fulfilled' ? { ...(moatRes.value.data?.data || {}), _meta: mkMeta(moatRes.value.data) } : mkFailed(),
+                            exit: exitRes.status === 'fulfilled' ? { ...(exitRes.value.data?.data || {}), _meta: mkMeta(exitRes.value.data) } : mkFailed(),
+                        };
+                        setExtIntel(extIntelResult);
+                        setCachedResult(cleanedText, resultData, resultDsData, resultWarData, null, extIntelResult);
+                    });
                 }).finally(() => setExtIntelLoading(false));
             } else {
                 if (response.reason.name === 'CanceledError' || response.reason.name === 'AbortError') {
@@ -739,7 +1077,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                         isSaved={isSaved}
                         onBack={() => { setData(null); setStatus('idle'); }}
                         onSave={() => { onSave(data); setIsSaved(true); }}
-                        onExport={generatePDF}
+                        onExport={generateHTML}
                     />
 
                     {data.credibility && (
@@ -761,15 +1099,26 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     ['Estimated', data.credibility.estimated_fields, 'estimated'],
                                     ['Inferred', data.credibility.inferred_fields, 'inferred'],
                                     ['Unsupported', data.credibility.unsupported_fields, 'unsupported'],
-                                ].map(([label, value, status]) => (
-                                    <div key={String(label)} className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4">
-                                        <div className="flex items-center justify-between mb-2">
+                                ].map(([label, value, status]) => {
+                                    const fields = Array.isArray(value) ? value as string[] : [];
+                                    return (
+                                    <div key={String(label)} className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col gap-2">
+                                        <div className="flex items-center justify-between">
                                             <div className="text-[10px] uppercase tracking-widest font-black text-slate-500">{label}</div>
                                             <CredibilityBadge status={status as CredibilityStatus} />
                                         </div>
-                                        <div className="text-2xl font-black text-white tracking-tighter">{value}</div>
+                                        <div className="text-3xl font-black text-white tracking-tighter">{fields.length}</div>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {fields.map((f: string) => (
+                                                <span key={f} className="text-[9px] font-mono text-slate-400 bg-slate-800/60 border border-slate-700/50 rounded px-1.5 py-0.5 break-all">
+                                                    {f.replace('market.', '').replace('competitor.', '').replace('dept_', '').replace('god_mode', 'verdict')}
+                                                </span>
+                                            ))}
+                                            {fields.length === 0 && <span className="text-[9px] text-slate-600 italic">none</span>}
+                                        </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -1047,8 +1396,33 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                     {deepIntelOpen === key && deepIntel?.[key as keyof typeof deepIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
                                             {renderPanelMeta((deepIntel[key as keyof typeof deepIntel] as any)?._meta)}
-                                            {/* Error fallback for deep intel sections */}
-                                            {deepIntel[key as keyof typeof deepIntel]?.error && (
+                                            {/* Timeout/network failure — show retry */}
+                                            {(deepIntel[key as keyof typeof deepIntel] as any)?._failed && (
+                                                <div className="p-5 bg-slate-950 rounded-xl border border-amber-900/40 text-center space-y-3">
+                                                    <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
+                                                    <p className="text-slate-400 text-sm font-semibold">This section timed out — the LLM took too long to respond.</p>
+                                                    <p className="text-slate-500 text-xs">Click retry to load just this section.</p>
+                                                    <button
+                                                        onClick={() => {
+                                                            const payload = key === 'fin' || key === 'gtm' || key === 'risk'
+                                                                ? extPayload
+                                                                : { idea: cleanedText };
+                                                            const extId = key === 'fin' ? 'financial-projection' : key === 'gtm' ? 'gtm-strategy' : 'risk-scanner';
+                                                            api.post('/run', { extension_id: extId, payload }, { timeout: 180000 }).then((res: any) => {
+                                                                setDeepIntel((prev: any) => ({
+                                                                    ...prev,
+                                                                    [key]: { ...(res.data?.data || {}), _meta: { provenance_level: res.data?.provenance_level, evidence_used: res.data?.evidence_used } }
+                                                                }));
+                                                            }).catch(() => {});
+                                                        }}
+                                                        className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors"
+                                                    >
+                                                        ↻ Retry {label}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {/* LLM returned error response */}
+                                            {!(deepIntel[key as keyof typeof deepIntel] as any)?._failed && deepIntel[key as keyof typeof deepIntel]?.error && (
                                                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
                                                     <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
                                                     <p className="text-slate-400 text-xs">Analysis unavailable — LLM did not return valid data for this section.</p>
@@ -1236,19 +1610,40 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                             </>}
                                         </div>
                                     )}
-                                    {extIntelOpen === key && !extIntel?.[key as keyof typeof extIntel] && !extIntelLoading && (
-                                        <div className="px-5 pb-6 border-t border-slate-800 pt-4">
-                                            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
-                                                <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
-                                                <p className="text-slate-400 text-xs">Extension timed out or failed to generate data.</p>
-                                            </div>
-                                        </div>
-                                    )}
                                     {extIntelOpen === key && extIntel?.[key as keyof typeof extIntel] && (
                                         <div className="px-5 pb-6 border-t border-slate-800 pt-4">
                                             {renderPanelMeta((extIntel[key as keyof typeof extIntel] as any)?._meta)}
-                                            {/* Error fallback for any section */}
-                                            {extIntel[key as keyof typeof extIntel]?.error && (
+                                            {/* Timeout/network failure — show retry */}
+                                            {(extIntel[key as keyof typeof extIntel] as any)?._failed && (
+                                                <div className="p-5 bg-slate-950 rounded-xl border border-amber-900/40 text-center space-y-3">
+                                                    <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
+                                                    <p className="text-slate-400 text-sm font-semibold">This section timed out — the LLM took too long to respond.</p>
+                                                    <p className="text-slate-500 text-xs">Click retry to load just this section.</p>
+                                                    <button
+                                                        onClick={() => {
+                                                            const extIdMap: Record<string, string> = {
+                                                                personas: 'user-persona', redFlags: 'people-analysis',
+                                                                pricing: 'pricing-strategy', funding: 'funding-readiness',
+                                                                legalRisks: 'legal-risks', traction: 'traction-signals',
+                                                                moat: 'moat-analysis', exit: 'exit-scenarios',
+                                                            };
+                                                            const needsMarket = ['pricing', 'funding', 'exit'];
+                                                            const payload = needsMarket.includes(key) ? extPayload : { idea: cleanedText };
+                                                            api.post('/run', { extension_id: extIdMap[key], payload }, { timeout: 180000 }).then((res: any) => {
+                                                                setExtIntel((prev: any) => ({
+                                                                    ...prev,
+                                                                    [key]: { ...(res.data?.data || {}), _meta: mkMeta(res.data) }
+                                                                }));
+                                                            }).catch(() => {});
+                                                        }}
+                                                        className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors"
+                                                    >
+                                                        ↻ Retry {label}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {/* LLM returned error response */}
+                                            {!(extIntel[key as keyof typeof extIntel] as any)?._failed && extIntel[key as keyof typeof extIntel]?.error && (
                                                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
                                                     <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
                                                     <p className="text-slate-400 text-xs">Analysis unavailable — LLM did not return valid data for this section.</p>
@@ -1386,7 +1781,7 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
                                                     {Array.isArray(extIntel.exit.likely_acquirers) && extIntel.exit.likely_acquirers.length > 0 && (
                                                         <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                                                             <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Likely Acquirers</p>
-                                                            {extIntel.exit.likely_acquirers.map((a: any, i: number) => <p key={i} className="text-slate-300 text-[11px]">• {typeof a === 'string' ? a : a?.name || JSON.stringify(a)}</p>)}
+                                                            {extIntel.exit.likely_acquirers.map((a: any, i: number) => <p key={i} className="text-slate-300 text-[11px]">• {typeof a === 'string' ? a : a?.name || a?.company || a?.acquirer || Object.values(a as object).filter((v): v is string => typeof v === 'string').join(' — ')}</p>)}
                                                         </div>
                                                     )}
                                                 </div>

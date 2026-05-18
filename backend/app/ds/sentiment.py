@@ -137,6 +137,87 @@ COMPETITOR_KB = {
         "pricing":     "Quote-based",
         "kill_strategy": "Launch a self-serve freight platform for SMB importers Flexport ignores below their ACV"
     },
+    # Mental Wellness / Employee Wellness
+    "headspace": {
+        "pain_points": ["Generic content not tailored to work stress", "Low employee engagement after month 1", "No manager-level insights or reporting", "Expensive per-seat for large orgs"],
+        "strengths":   ["Strong brand recognition", "High-quality meditation content", "Easy onboarding"],
+        "pricing":     "$12.99/month consumer / $7.99+/user/month enterprise",
+        "kill_strategy": "Win with clinician-backed CBT modules and ROI dashboards that Headspace's content-only approach cannot offer HR buyers"
+    },
+    "headspace for organizations": {
+        "pain_points": ["Generic content not tailored to work stress", "Low employee engagement after month 1", "No manager-level insights or reporting", "Expensive per-seat for large orgs"],
+        "strengths":   ["Strong brand recognition", "High-quality meditation content", "Easy onboarding"],
+        "pricing":     "$7.99+/user/month (volume discounts available)",
+        "kill_strategy": "Win with clinician-backed CBT modules and ROI dashboards that Headspace's content-only approach cannot offer HR buyers"
+    },
+    "lyra health": {
+        "pain_points": ["Limited therapist network outside major cities", "Long wait times for first appointment", "High cost per member for smaller employers", "No self-serve tools between sessions"],
+        "strengths":   ["Clinical credibility", "EAP replacement positioning", "Strong enterprise sales"],
+        "pricing":     "$200-$400/employee/year (employer-sponsored)",
+        "kill_strategy": "Undercut with AI-first triage + on-demand tools that fill the gap between sessions Lyra leaves unaddressed"
+    },
+    "mantracare": {
+        "pain_points": ["Limited brand recognition outside India/Asia", "Inconsistent therapist quality", "Basic app UX", "No employer analytics dashboard"],
+        "strengths":   ["Affordable pricing", "Wide therapist network in emerging markets", "Multi-modal support"],
+        "pricing":     "$5-$20/session",
+        "kill_strategy": "Compete on employer ROI reporting and AI-personalized care pathways MantraCare's generic platform lacks"
+    },
+    "betterhelp": {
+        "pain_points": ["Privacy concerns and data sharing controversies", "Therapist matching takes too long", "No in-person option", "Not covered by insurance"],
+        "strengths":   ["Largest online therapy platform", "Fast signup", "Wide therapist pool"],
+        "pricing":     "$60-$100/week",
+        "kill_strategy": "Target employer-sponsored use cases BetterHelp ignores — offer insurance integration and manager wellbeing dashboards"
+    },
+    "calm": {
+        "pain_points": ["Passive consumption, not clinical intervention", "Low retention after free trial", "No corporate ROI metrics", "Content feels repetitive after 6 months"],
+        "strengths":   ["Top consumer brand", "Sleep content leadership", "Celebrity partnerships"],
+        "pricing":     "$14.99/month / $69.99/year",
+        "kill_strategy": "Position as clinically validated alternative — Calm can't claim therapeutic outcomes, you can"
+    },
+    "spring health": {
+        "pain_points": ["High minimum contract size excludes mid-market", "Onboarding takes 3-4 months", "Black-box precision matching algorithm", "Limited international therapist coverage"],
+        "strengths":   ["Precision mental health matching", "Clinical outcomes data", "Strong VC backing"],
+        "pricing":     "$300-$500/employee/year",
+        "kill_strategy": "Win mid-market employers Spring Health ignores with faster deployment and transparent matching criteria"
+    },
+    "modern health": {
+        "pain_points": ["High price point for smaller companies", "Therapist availability varies by region", "Coaching vs therapy distinction confuses buyers", "Limited crisis support"],
+        "strengths":   ["Whole-person approach", "Coaching + therapy combo", "Strong employer brand"],
+        "pricing":     "$200-$450/employee/year",
+        "kill_strategy": "Differentiate with AI-driven early intervention that catches burnout before it escalates to clinical need"
+    },
+    # Productivity / Remote Work
+    "notion": {
+        "pain_points": ["Steep learning curve for non-technical users", "Slow on large databases", "No native time tracking", "Offline mode unreliable"],
+        "strengths":   ["Highly flexible", "Strong community", "All-in-one workspace"],
+        "pricing":     "Free / $8-$15/user/month",
+        "kill_strategy": "Win teams that find Notion too complex with an opinionated, pre-built workflow that works out of the box"
+    },
+    "slack": {
+        "pain_points": ["Notification overload causes burnout", "Expensive at scale", "Messages get lost in channels", "No built-in project management"],
+        "strengths":   ["Category-defining brand", "Massive integrations", "Strong network effects"],
+        "pricing":     "Free / $7.25-$12.50/user/month",
+        "kill_strategy": "Attack Slack's async blindspot — async-first teams need structured communication tools Slack's real-time model doesn't support"
+    },
+    "zoom": {
+        "pain_points": ["Zoom fatigue is real and documented", "Security concerns persist", "No async video by default", "Poor breakout room UX"],
+        "strengths":   ["Dominant video brand", "Reliable infrastructure", "Easy guest access"],
+        "pricing":     "Free / $13.33-$18.32/user/month",
+        "kill_strategy": "Win with async-first video that reduces meeting load — Zoom's sync-only model accelerates remote burnout"
+    },
+    # Dog walking / Pet Services
+    "rover": {
+        "pain_points": ["High service fees (15-20%)", "Inconsistent sitter quality", "No GPS tracking", "Limited insurance coverage"],
+        "strengths":   ["Largest pet sitter network", "Strong brand", "Easy booking UX"],
+        "pricing":     "$15-$40/walk + 15% platform fee",
+        "kill_strategy": "Undercut on fees and win on trust — real-time GPS tracking and vetted walkers Rover's peer model can't guarantee"
+    },
+    "wag": {
+        "pain_points": ["Past safety incidents damaged trust", "Inconsistent walker quality", "Customer support slow to respond", "App reliability issues"],
+        "strengths":   ["On-demand availability", "Wide city coverage", "Subscription option"],
+        "pricing":     "$20-$35/walk",
+        "kill_strategy": "Win on safety and trust — background-checked, insured walkers with live GPS that Wag's on-demand model struggles to guarantee"
+    },
 }
 
 # ── Sector-level fallback pain points ──────────────────────────────────────
@@ -202,6 +283,19 @@ def analyze_competitor(name: str, sector: int = 9) -> Dict:
     fallback_pains = SECTOR_PAIN_FALLBACK.get(sector, SECTOR_PAIN_FALLBACK[9])
     pain_score = _score_pain_points(fallback_pains)
 
+    sector_strategies = {
+        0: f"Outcompete {name} on pricing transparency and reliability — AI/API incumbents all suffer from unpredictable costs",
+        1: f"Attack {name}'s compliance gaps and onboarding friction with a faster, lower-fee alternative",
+        2: f"Win clinicians and patients {name} ignores with better data privacy and faster reimbursement workflows",
+        3: f"Displace {name} with outcome-based pricing and AI-personalized learning paths they can't match",
+        4: f"Undercut {name}'s per-seat model with a usage-based tier and a 10-minute onboarding that replaces their 3-month implementation",
+        5: f"Capture {name}'s margin-squeezed customers with zero transaction fees and a D2C-optimized checkout",
+        6: f"Win the clients {name} loses to billing complexity — offer transparent flat-fee pricing with AI-assisted compliance",
+        7: f"Serve the SMB shippers {name} ignores below their ACV threshold with a self-serve, real-time visibility platform",
+        8: f"Move faster than {name} — digitize the paper-heavy workflows that slow their deal cycles",
+        9: f"Find the customer segment {name} underserves and own it with a focused product at half the price",
+    }
+
     return {
         "name":          name,
         "known":         False,
@@ -209,7 +303,7 @@ def analyze_competitor(name: str, sector: int = 9) -> Dict:
         "top_complaints": fallback_pains,
         "strengths":     ["Established user base", "Brand recognition"],
         "pricing":       "Market-rate pricing",
-        "kill_strategy": f"Identify {name}'s weakest customer segment and offer a focused alternative with superior UX",
+        "kill_strategy": sector_strategies.get(sector, sector_strategies[9]),
     }
 
 

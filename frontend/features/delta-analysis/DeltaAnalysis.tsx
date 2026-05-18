@@ -117,8 +117,9 @@ function DeltaAnalysisApp({ archive, setArchive }: { archive: RealData[], setArc
                                     </button>
                                     <ShieldCheck className={`w-5 h-5 mb-3 ${isSelected ? 'text-cyan-400' : 'text-slate-600'}`} />
                                     <h3 className="text-sm font-black text-white mb-3 line-clamp-2">"{report.idea}"</h3>
-                                    <div className="flex gap-3 text-[10px] font-black uppercase text-slate-500">
+                                    <div className="flex flex-wrap gap-3 text-[10px] font-black uppercase text-slate-500">
                                         <span>TAM: <span className="text-cyan-400">{report.market?.forecast_tam || '—'}</span></span>
+                                        <span>Growth: <span className="text-emerald-400">{report.market?.growth || '—'}</span></span>
                                         <span>Risk: <span className="text-amber-400">{report.god_mode?.risk_score || '—'}</span></span>
                                     </div>
                                 </div>
@@ -143,7 +144,17 @@ function DeltaAnalysisApp({ archive, setArchive }: { archive: RealData[], setArc
                                 {loading ? 'BATTLING...' : 'BATTLE'}
                             </button>
                         )}
-                        {error && <p className="text-red-400 text-sm">{error}</p>}
+                        {error && (
+                            <div className="flex flex-col items-center gap-2">
+                                <p className="text-red-400 text-sm">{error}</p>
+                                <button
+                                    onClick={runBattle}
+                                    className="text-cyan-400 hover:text-cyan-300 text-sm font-black tracking-wide border border-cyan-500/30 px-4 py-1.5 rounded-full hover:border-cyan-400/60 transition-all"
+                                >
+                                    ↻ Retry Battle
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Battle Result */}
@@ -165,9 +176,9 @@ function DeltaAnalysisApp({ archive, setArchive }: { archive: RealData[], setArc
                                     <div className="space-y-0">
                                         {/* Column headers */}
                                         <div className="grid grid-cols-3 gap-4 mb-3">
-                                            <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest text-center truncate">{getReport(selectedIds[0])?.idea?.slice(0, 20)}...</div>
+                                            <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest text-center truncate">{getReport(selectedIds[0])?.idea?.split(' ').slice(0, 4).join(' ')}…</div>
                                             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Category</div>
-                                            <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest text-center truncate">{getReport(selectedIds[1])?.idea?.slice(0, 20)}...</div>
+                                            <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest text-center truncate">{getReport(selectedIds[1])?.idea?.split(' ').slice(0, 4).join(' ')}…</div>
                                         </div>
                                         {scoreKeys.map((key) => {
                                             const row = battleResult.scorecard[key];

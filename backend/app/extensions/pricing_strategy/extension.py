@@ -32,4 +32,5 @@ Return ONLY valid JSON:
         if not data:
             result_json = call_gemini_fast(prompt)
             data = safe_parse_json(result_json)
+        # PAID KEY: line below is safe to delete — paid models reliably return valid JSON, this fallback is only needed for free-tier parse failures
         return data if data else {"error": "Pricing strategy unavailable"}

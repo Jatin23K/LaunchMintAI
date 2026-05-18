@@ -6,6 +6,7 @@ Fallback: Gemini training knowledge with Medium confidence.
 """
 
 import os
+import random
 import asyncio
 import httpx
 import logging
@@ -24,15 +25,11 @@ _raw_exa = [
     os.getenv("EXA_API_KEY_6"),
 ]
 EXA_KEYS = list(dict.fromkeys(k for k in _raw_exa if k))
-_exa_idx = 0
 
 def _next_exa_key() -> str | None:
-    global _exa_idx
     if not EXA_KEYS:
         return None
-    key = EXA_KEYS[_exa_idx % len(EXA_KEYS)]
-    _exa_idx += 1
-    return key
+    return random.choice(EXA_KEYS)
 
 # ── SERPER KEY VAULT ──────────────────────────────────────────────────────────
 _raw_serper = [
@@ -45,15 +42,11 @@ _raw_serper = [
     os.getenv("SERPER_API_KEY_6"),
 ]
 SERPER_KEYS = list(dict.fromkeys(k for k in _raw_serper if k))
-_serper_idx = 0
 
 def _next_serper_key() -> str | None:
-    global _serper_idx
     if not SERPER_KEYS:
         return None
-    key = SERPER_KEYS[_serper_idx % len(SERPER_KEYS)]
-    _serper_idx += 1
-    return key
+    return random.choice(SERPER_KEYS)
 
 # ── SOURCE QUALITY FILTERS ────────────────────────────────────────────────────
 TIER_0_DOMAINS = [
