@@ -39,48 +39,57 @@ MODEL_PATH = DS_DIR / "models" / "startup_classifier.pkl"
 # ── Sector Keyword Map ─────────────────────────────────────────────────────
 SECTOR_MAP = {
     0: ["ai", "machine learning", "llm", "gpt", "neural", "deep learning"],
-    1: ["fintech", "finance", "payment", "banking", "insurance"],
-    2: ["health", "medical", "healthcare", "biotech", "pharma"],
-    3: ["education", "edtech", "learning", "tutoring"],
-    4: ["saas", "software", "platform", "api", "developer", "tool"],
+    1: ["fintech", "finance", "payment", "banking", "insurance", "financial coaching",
+        "financial planning", "wealth management", "investment", "accounting", "accountant",
+        "cash flow", "bookkeeping", "tax", "payroll", "invoicing"],
+    2: ["health", "medical", "healthcare", "biotech", "pharma", "wellness", "mental health",
+        "clinical", "patient", "therapy"],
+    3: ["education", "edtech", "learning", "tutoring", "coaching", "training"],
+    4: ["saas", "software", "platform", "api", "developer", "tool", "hiring", "recruiter",
+        "recruitment", "talent", "hr tech", "hrtech", "applicant", "ats"],
     5: ["ecommerce", "marketplace", "retail", "shopping"],
-    6: ["legal", "compliance", "law", "contract"],
-    7: ["logistics", "delivery", "transport", "supply chain"],
+    6: ["legal", "compliance", "law", "contract", "regulatory", "litigation", "attorney",
+        "counsel", "paralegal", "in-house legal"],
+    7: ["logistics", "delivery", "transport", "supply chain", "traceability", "blockchain supply",
+        "food safety", "farm to"],
     8: ["real estate", "proptech", "property", "housing"],
     9: ["other"]
 }
 
-AI_KEYWORDS         = ["ai", "artificial intelligence", "machine learning",
-                        "ml", "llm", "gpt", "neural", "deep learning", "nlp"]
-B2B_KEYWORDS        = ["saas", "enterprise", "b2b", "business", "api",
-                        "platform", "developer", "crm", "erp", "tool"]
-B2C_KEYWORDS        = ["consumer", "app", "social", "marketplace",
-                        "retail", "shopping", "delivery"]
-REGULATORY_SECTORS  = ["health", "medical", "legal", "finance",
-                        "banking", "insurance", "pharma"]
+AI_KEYWORDS         = ["ai", "machine learning", "llm", "gpt", "neural", "deep learning", "nlp",
+                        "ai-powered", "ai powered", "intelligent", "predictive", "generative"]
+B2B_KEYWORDS        = ["saas", "enterprise", "b2b", "business", "api", "platform", "developer",
+                        "crm", "erp", "tool", "recruiter", "recruitment", "hiring", "talent",
+                        "hr", "hrtech", "supply chain", "traceability", "compliance", "co-pilot",
+                        "copilot", "workflow", "automation for"]
+B2C_KEYWORDS        = ["consumer", "social", "marketplace", "retail", "shopping", "delivery",
+                        "gen z", "personal finance", "for students", "for individuals"]
+REGULATORY_SECTORS  = ["health", "medical", "legal", "finance", "banking", "insurance",
+                        "pharma", "wellness", "financial coaching", "financial planning",
+                        "investment", "wealth"]
 
 WINNERS = {
     6: ["Ironclad", "Harvey AI", "Clio"],
-    1: ["Stripe", "Plaid", "Brex"],
-    2: ["Oscar Health", "Ro", "Noom"],
+    1: ["Stripe", "Plaid", "Brex", "SoFi", "Chime"],
+    2: ["Oscar Health", "Ro", "Noom", "Headspace for Work"],
     0: ["OpenAI", "Anthropic", "Cohere"],
-    4: ["Notion", "Linear", "Figma"],
+    4: ["Greenhouse", "Lever", "Workday Recruiting", "Rippling", "Notion", "Linear"],
     3: ["Duolingo", "Coursera", "Quizlet"],
     5: ["Shopify", "Klaviyo", "Gorgias"],
-    7: ["Flexport", "project44", "Samsara"],
+    7: ["Flexport", "project44", "IBM Food Trust"],
     8: ["Opendoor", "Compass", "Loft"],
     9: ["YC alumni", "a16z portfolio", "Sequoia-backed"]
 }
 
 LOSERS = {
     6: ["Atrium", "UpCounsel"],
-    1: ["Wonga", "Dave"],
+    1: ["Wonga", "Dave", "MoneyLion (struggles)"],
     2: ["Theranos", "Forward Health"],
     0: ["Stability AI (challenges)", "Jasper (declining)"],
-    4: ["Quibi", "Clubhouse"],
+    4: ["HireVue (bias lawsuits)", "Pymetrics (acquired-pivoted)", "Clubhouse"],
     3: ["Udacity (pivoted)", "Outschool"],
     5: ["Fab.com", "Jet.com"],
-    7: ["Shypdirect", "Bringg"],
+    7: ["Shypdirect", "Bringg", "Ripe.io (food blockchain, failed)"],
     8: ["Cadre", "RealtyShares"],
     9: ["Single-feature apps", "Copycat products"]
 }
@@ -89,10 +98,16 @@ LOSERS = {
 # ── Feature Extractor ──────────────────────────────────────────────────────
 
 def extract_sector(idea: str) -> int:
+    """
+    Check specific sectors (1-8) BEFORE generic AI sector (0).
+    Prevents 'AI-powered cash flow tool' from being classified as AI sector
+    instead of the correct Fintech sector.
+    """
     idea_lower = idea.lower()
-    for sector_id, keywords in SECTOR_MAP.items():
-        if sector_id == 9:
-            continue
+    # Priority: specific sectors first, AI last
+    priority_order = [1, 2, 3, 6, 7, 8, 4, 5, 0]
+    for sector_id in priority_order:
+        keywords = SECTOR_MAP.get(sector_id, [])
         if _has_word(idea_lower, keywords):
             return sector_id
     return 9

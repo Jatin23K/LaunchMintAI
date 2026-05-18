@@ -39,4 +39,5 @@ Return exactly 3 red flags."""
             result_json = call_gemini_fast(prompt)
             data = safe_parse_json(result_json)
 
+        # PAID KEY: line below is safe to delete — paid models reliably return valid JSON, this fallback is only needed for free-tier parse failures
         return data if data else {"error": "Red flag analysis unavailable", "raw": result_json[:200] if result_json else ""}

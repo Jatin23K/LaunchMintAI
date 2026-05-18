@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import Any
 import sys
 import os
+import re
+import asyncio
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -36,6 +38,12 @@ class ExtensionRequest(BaseModel):
 
 class AnalyzeRequest(BaseModel):
     idea: str
+
+class CompareRequest(BaseModel):
+    idea_a: str
+    market_a: dict = {}
+    idea_b: str
+    market_b: dict = {}
 
 # 2. MANUAL IMPORT (No Try/Except - We want to see the REAL error)
 print("[WAIT] Importing Extensions...")
@@ -149,12 +157,173 @@ async def run_extension(req: ExtensionRequest):
         }
 
 # =============================================================================
+# BATTLE ROOM — /compare endpoint
+# =============================================================================
+
+def _parse_tam(val) -> float:
+    """Parse TAM string to float in billions. Handles $15.2B, $850M, $2.1T."""
+    if val is None:
+        return 0.0
+    s = str(val).upper().replace(',', '').replace(' ', '')
+    m = re.search(r'(\d+(?:\.\d+)?)', s)
+    if not m:
+        return 0.0
+    num = float(m.group(1))
+    rest = s[m.end():m.end()+3]
+    if rest.startswith('T') and not rest.startswith('TH'):
+        num *= 1000       # trillion → billions
+    elif rest.startswith('M') and 'MI' not in rest and 'MO' not in rest:
+        num /= 1000       # million → billions
+    # B or bare number = already in billions
+    return round(num, 2)
+
+def _parse_pct(val) -> float:
+    """Extract numeric value — handles growth %, risk scores, and text tiers."""
+    if val is None:
+        return 0.0
+    s = str(val).strip().upper()
+    # Map text risk tiers to numeric scores (1-10 scale)
+    risk_map = {
+        'LOW': 2.0, 'MINIMAL': 2.0, 'VERY LOW': 2.0,
+        'MEDIUM': 5.0, 'MODERATE': 5.0,
+        'HIGH': 7.5, 'ELEVATED': 7.5,
+        'CRITICAL': 9.0, 'EXTREME': 9.0, 'VERY HIGH': 9.0,
+    }
+    if s in risk_map:
+        return risk_map[s]
+    m = re.search(r'(\d+(?:\.\d+)?)', s)
+    return round(float(m.group(1)), 2) if m else 0.0
+
+def _execution_score(idea: str) -> float:
+    """Score execution feasibility 0-10 from idea text alone."""
+    idea_lower = idea.lower()
+    score = 5.0
+    b2b = ["saas", "enterprise", "b2b", "platform", "tool", "api",
+           "accounting", "legal", "compliance", "workflow", "automation",
+           "recruiter", "co-pilot", "copilot", "forecasting"]
+    ai  = ["ai", "ai-powered", "machine learning", "llm", "intelligent",
+           "predictive", "generative", "nlp"]
+    if any(k in idea_lower for k in b2b):
+        score += 1.5   # B2B = clearer monetisation path
+    if any(k in idea_lower for k in ai):
+        score += 1.0   # AI = current investor tailwind
+    if len(idea.split()) > 6:
+        score += 0.5   # specific idea = focused execution
+    return round(min(score, 10.0), 1)
+
+@app.post("/compare")
+async def compare_ideas(req: CompareRequest):
+    a, b = req.market_a, req.market_b
+
+    # ── Parse all signals ───────────────────────────────────────────────────
+    tam_a    = _parse_tam(a.get('forecast_tam') or a.get('size'))
+    tam_b    = _parse_tam(b.get('forecast_tam') or b.get('size'))
+    growth_a = _parse_pct(a.get('growth'))
+    growth_b = _parse_pct(b.get('growth'))
+    risk_a   = _parse_pct(a.get('risk_score', '5'))   # lower = better
+    risk_b   = _parse_pct(b.get('risk_score', '5'))
+    exec_a   = _execution_score(req.idea_a)
+    exec_b   = _execution_score(req.idea_b)
+
+    # Investor appeal: weighted composite (TAM × growth × safety)
+    def _invest(tam, growth, risk):
+        return round(max(tam, 0.1) * 0.4 + max(growth, 0.1) * 0.3 + (10 - risk) * 0.3, 2)
+    inv_a = _invest(tam_a, growth_a, risk_a)
+    inv_b = _invest(tam_b, growth_b, risk_b)
+
+    # ── Score 5 categories ─────────────────────────────────────────────────
+    scorecard = {
+        'market_size': {
+            'a': f"${tam_a}B TAM",
+            'b': f"${tam_b}B TAM",
+            'winner': 'A' if tam_a >= tam_b else 'B',
+        },
+        'growth_rate': {
+            'a': f"{growth_a}% CAGR",
+            'b': f"{growth_b}% CAGR",
+            'winner': 'A' if growth_a >= growth_b else 'B',
+        },
+        'competition': {
+            'a': f"Risk {risk_a}/10",
+            'b': f"Risk {risk_b}/10",
+            'winner': 'A' if risk_a <= risk_b else 'B',   # lower risk wins
+        },
+        'execution': {
+            'a': f"Score {exec_a}/10",
+            'b': f"Score {exec_b}/10",
+            'winner': 'A' if exec_a >= exec_b else 'B',
+        },
+        'investor_appeal': {
+            'a': f"Index {inv_a}",
+            'b': f"Index {inv_b}",
+            'winner': 'A' if inv_a >= inv_b else 'B',
+        },
+    }
+
+    # ── Determine overall winner ────────────────────────────────────────────
+    wins_a = sum(1 for c in scorecard.values() if c['winner'] == 'A')
+    wins_b = sum(1 for c in scorecard.values() if c['winner'] == 'B')
+
+    if wins_a > wins_b:
+        winner = 'A'
+    elif wins_b > wins_a:
+        winner = 'B'
+    else:
+        # Tie-breaker: larger TAM wins
+        winner = 'A' if tam_a >= tam_b else 'B'
+
+    w_idea = req.idea_a if winner == 'A' else req.idea_b
+    l_idea = req.idea_b if winner == 'A' else req.idea_a
+    w_mkt  = a if winner == 'A' else b
+    l_mkt  = b if winner == 'A' else a
+
+    # ── Gemini verdict (2 sentences) ───────────────────────────────────────
+    verdict_prompt = (
+        f'You are a brutal startup investment analyst. '
+        f'In exactly 2 sentences explain why "{w_idea}" beats "{l_idea}".\n'
+        f'Winner — TAM: {w_mkt.get("forecast_tam","?")}, '
+        f'Growth: {w_mkt.get("growth","?")}, Risk: {w_mkt.get("risk_score","?")}\n'
+        f'Loser  — TAM: {l_mkt.get("forecast_tam","?")}, '
+        f'Growth: {l_mkt.get("growth","?")}, Risk: {l_mkt.get("risk_score","?")}\n'
+        f'Be specific, reference actual numbers, no fluff. Exactly 2 sentences.'
+    )
+    try:
+        verdict = await asyncio.to_thread(call_gemini_fast, verdict_prompt)
+        if not verdict or len(verdict.strip()) < 20:
+            raise ValueError("empty verdict")
+    except Exception:
+        verdict = (
+            f'"{w_idea}" wins on stronger market fundamentals — '
+            f'larger TAM and better growth trajectory make it the clear investment priority.'
+        )
+
+    # Strip escaped quotes Gemini sometimes returns
+    clean_verdict = verdict.strip().replace('\\"', '"').replace("\\'", "'")
+    # Strip JSON wrapper if Gemini returns {"explanation": "..."} or {"verdict": "..."}
+    import json as _json
+    try:
+        parsed = _json.loads(clean_verdict)
+        if isinstance(parsed, dict):
+            clean_verdict = next((v for v in parsed.values() if isinstance(v, str)), clean_verdict)
+    except Exception:
+        pass
+
+    return {
+        "winner":    winner,
+        "verdict":   clean_verdict,
+        "scorecard": scorecard,
+        "wins_a":    wins_a,
+        "wins_b":    wins_b,
+    }
+
+
+# =============================================================================
 # LIVE RESEARCH ENGINE ENDPOINT
 # =============================================================================
 # NOTE: The /analyze endpoint is now defined in llm_engine.py
 # We'll mount it here to make it accessible
 
-from app.services.llm_engine import app as llm_app
+from app.services.llm_engine import app as llm_app, call_gemini_fast
 
 #  DS Layer moved to llm_engine.py
 

@@ -32,10 +32,10 @@ const AnalysisHeader: React.FC<Props> = ({ idea, isSaved, onBack, onSave, onExpo
           </button>
           <button
             onClick={onExport}
-            aria-label="Export analysis as PDF"
+            aria-label="Export analysis as HTML"
             className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-all text-sm font-bold"
           >
-            <Download className="w-4 h-4" /> Export PDF
+            <Download className="w-4 h-4" /> Export HTML
           </button>
         </div>
       </div>
