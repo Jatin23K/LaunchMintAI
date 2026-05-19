@@ -1232,6 +1232,36 @@ async def analyze_stream(idea: str):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+# OPT 9: SSE progress stream — frontend subscribes to this for real-time stage updates
+# while the main /analyze call runs in parallel.
+try:
+    from sse_starlette.sse import EventSourceResponse
+    _SSE_AVAILABLE = True
+except ImportError:
+    _SSE_AVAILABLE = False
+
+_ANALYZE_STAGES = [
+    ("searching",    "Searching live market data..."),
+    ("competitors",  "Identifying competitors..."),
+    ("scoring",      "Running DS scoring pipeline..."),
+    ("extensions",   "Running deep intelligence modules..."),
+    ("synthesizing", "Synthesizing final report..."),
+]
+
+@app.get("/analyze/stream")
+async def analyze_stream(idea: str):
+    """SSE endpoint — emits named stage events every ~2s while analysis runs."""
+    if not _SSE_AVAILABLE:
+        return {"error": "SSE not available"}
+
+    async def event_generator():
+        for stage_id, label in _ANALYZE_STAGES:
+            yield {"event": "stage", "data": f'{{"stage":"{stage_id}","label":"{label}"}}'}
+            await asyncio.sleep(2.2)
+        yield {"event": "done", "data": "{}"}
+
+    return EventSourceResponse(event_generator())
+
 @app.post("/analyze")
 @_rate_limit
 async def analyze(req: IdeaRequest, request: Request = None):
