@@ -9,6 +9,7 @@ sqlmodel
 chromadb==1.1.1
 loguru
 pydantic-settings
+slowapi==0.1.9
 # DS Intelligence Layer — versions with pre-built wheels for Python 3.11-3.14
 xgboost>=2.0.3
 scikit-learn>=1.5.2

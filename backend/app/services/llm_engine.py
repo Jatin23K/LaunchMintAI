@@ -12,12 +12,47 @@ import re
 import time
 import asyncio
 import threading
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 import concurrent.futures
+
+# ── OPT 1: Server-Side In-Memory Response Cache ────────────────────────────
+_RESPONSE_CACHE: dict[str, tuple[dict, float]] = {}  # key -> (result, timestamp)
+_CACHE_TTL = 86400  # 24 hours
+
+def _cache_get(key: str) -> dict | None:
+    if key in _RESPONSE_CACHE:
+        result, ts = _RESPONSE_CACHE[key]
+        if time.time() - ts < _CACHE_TTL:
+            return result
+        del _RESPONSE_CACHE[key]
+    return None
+
+def _cache_set(key: str, value: dict):
+    # Evict oldest if over 500 entries
+    if len(_RESPONSE_CACHE) >= 500:
+        oldest = min(_RESPONSE_CACHE, key=lambda k: _RESPONSE_CACHE[k][1])
+        del _RESPONSE_CACHE[oldest]
+    _RESPONSE_CACHE[key] = (value, time.time())
+
+# ── OPT 2: Dead Key Tracking ───────────────────────────────────────────────
+_DEAD_KEYS: dict[str, float] = {}  # key -> timestamp when marked dead
+_DEAD_KEY_COOLDOWN = 3600  # 60 minutes
+
+def _is_key_dead(key: str) -> bool:
+    if key in _DEAD_KEYS:
+        if time.time() - _DEAD_KEYS[key] < _DEAD_KEY_COOLDOWN:
+            return True
+        del _DEAD_KEYS[key]  # Recovered
+    return False
+
+def _mark_key_dead(key: str):
+    print(f"[KEY] Marking key ...{key[-6:]} as dead for 60 min")
+    _DEAD_KEYS[key] = time.time()
 
 # Limit concurrent Gemini API calls to avoid 429 rate limiting
 _gemini_semaphore = threading.Semaphore(4)
@@ -111,6 +146,16 @@ def _next_gemini_offset() -> int:
     _GEMINI_CALL_CTR += 1
     return offset
 
+def _next_live_gemini_key() -> str | None:
+    """OPT 2: Return next non-dead Gemini key, skipping dead keys."""
+    global _GEMINI_CALL_CTR
+    for i in range(len(_KEY_POOL)):
+        key = _KEY_POOL[(_GEMINI_CALL_CTR + i) % len(_KEY_POOL)]
+        if not _is_key_dead(key):
+            _GEMINI_CALL_CTR += 1
+            return key
+    return None  # All keys dead
+
 def _next_nim_offset() -> int:
     global _NIM_CALL_CTR
     if not _NIM_KEY_POOL:
@@ -120,6 +165,24 @@ def _next_nim_offset() -> int:
     return offset
 
 app = FastAPI()
+
+# OPT 3: Rate Limiting via slowapi
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    _limiter = Limiter(key_func=get_remote_address)
+    app.state.limiter = _limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    _RATE_LIMIT_AVAILABLE = True
+    print("[INIT] slowapi rate limiting enabled")
+except ImportError:
+    _limiter = None
+    _RATE_LIMIT_AVAILABLE = False
+    print("[INIT] slowapi not installed — rate limiting disabled")
+
+# Single decorator alias — no-op when slowapi absent
+_rate_limit = _limiter.limit("10/minute") if _RATE_LIMIT_AVAILABLE else (lambda f: f)
 
 app.add_middleware(
     CORSMiddleware,
@@ -716,6 +779,7 @@ def _gemini_request(prompt: str, model_id: str, api_key: str, timeout: int = 90)
             return None
         if res.status_code == 429:
             print(f"[GEMINI] 429 rate-limit — model={model_id} key=...{api_key[-6:]}")
+            _mark_key_dead(api_key)  # OPT 2: mark dead on 429
             return None
         print(f"[GEMINI] HTTP {res.status_code} — model={model_id}: {res.text[:200]}")
         return None
@@ -862,6 +926,32 @@ def clean_json(text):
         return json.loads(text)
     except:
         return None
+
+
+# OPT 4: Parallel LLM Race for pitch_forge and vc_roast
+async def _llm_race(prompt: str, gemini_offset: int, nim_offset: int, nim_model: str) -> dict | None:
+    """Fire Gemini Flash + NIM simultaneously. Return first valid JSON response."""
+    async def try_gemini():
+        raw = await asyncio.to_thread(call_gemini, prompt, None, gemini_offset)
+        return clean_json(raw)
+
+    async def try_nim():
+        raw = await asyncio.to_thread(call_nim, prompt, nim_model, nim_offset)
+        return clean_json(raw)
+
+    tasks = [asyncio.create_task(try_gemini()), asyncio.create_task(try_nim())]
+
+    for coro in asyncio.as_completed(tasks):
+        try:
+            result = await coro
+            if result:
+                # Cancel remaining tasks
+                for t in tasks:
+                    t.cancel()
+                return result
+        except Exception:
+            continue
+    return None
 
 def audit_search_results(results_list, query):
     """
@@ -1123,10 +1213,37 @@ def _tam_sanity_check(market: dict, source_objects: list):
             pass
 
 
+@app.get("/analyze/stream")
+async def analyze_stream(idea: str):
+    """OPT 8: SSE progress streaming — yields stage events while main analysis runs."""
+    async def event_generator():
+        stages = [
+            ("market_search", 15, "Searching markets..."),
+            ("competitor_analysis", 35, "Analyzing competitors..."),
+            ("ds_pipeline", 55, "Running DS pipeline..."),
+            ("god_mode", 75, "Computing risk scores..."),
+            ("complete", 100, "Analysis complete"),
+        ]
+        for stage, pct, label in stages:
+            yield f"data: {json.dumps({'stage': stage, 'pct': pct, 'label': label})}\n\n"
+            if stage != "complete":
+                await asyncio.sleep(12)  # ~60s total across 4 intervals
+    return StreamingResponse(event_generator(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 @app.post("/analyze")
-async def analyze(req: IdeaRequest):
+@_rate_limit
+async def analyze(req: IdeaRequest, request: Request = None):
     idea = req.idea
     print(f"\n[BRAIN] Analyzing: '{idea}'")
+
+    # OPT 1: Check server-side cache first
+    _cache_key = f"analyze:{idea.strip().lower()}"
+    _cached = _cache_get(_cache_key)
+    if _cached:
+        print(f"[CACHE] HIT for analyze: {idea}")
+        return {**_cached, "cached": True}
 
     # ── BATCH 1 (parallel): classify industry + competitor search ─────────────
     print("[PARALLEL] Batch 1: classify_industry + comp search")
@@ -1143,23 +1260,28 @@ async def analyze(req: IdeaRequest):
     industry_name = industry_data.get("industry_name", "Unknown")
     print(f"[OK] Sector: {industry_name} | Query: {search_query}")
 
-    # ── BATCH 2 (parallel): Tavily market search + extract competitor names ───
+    # ── BATCH 2 (parallel): Tavily market search + extract competitor names + OPT 7 web search parallelism ───
     extract_prompt = (
         f"Identify exactly the TOP 3 direct competitors from this text for '{idea}'. "
         f"Return ONLY a JSON list of strings (e.g. [\"OpenAI\", \"Anthropic\", \"Google\"]). "
         f"If no clear names, use major industry leaders in the sector. Text: {comp_prelim}"
     )
-    print("[PARALLEL] Batch 2: market search + extract comp names")
+    print("[PARALLEL] Batch 2: market search + extract comp names + OPT7 parallel web searches")
     try:
-        search_data, comp_names_raw = await asyncio.gather(
+        # OPT 7: Fire market + competitor web searches in parallel alongside Tavily + NIM
+        search_data, comp_names_raw, _web_market, _web_comp = await asyncio.gather(
             search_market_data(idea, search_query),                                      # Tavily async
             asyncio.to_thread(call_nim, extract_prompt, NIM_MODEL_FAST, _next_nim_offset()),  # NIM FAST: simple list extraction
+            asyncio.to_thread(search_web, idea, "financial"),   # OPT 7: parallel web search #1
+            asyncio.to_thread(search_web, idea, "competitor"),  # OPT 7: parallel web search #2
         )
     except Exception as _b2_err:
         print(f"[BATCH2] Partial failure: {_b2_err} — using fallback search data")
         search_data = {"results_count": 0, "raw_context": "", "source_objects": [], "top_source_url": "", "top_source_name": ""}
         comp_names_raw = "[]"
-    print(f"[OK] Market search: {search_data['results_count']} sources")
+        _web_market = ("", "", "")
+        _web_comp = ("", "", "")
+    print(f"[OK] Market search: {search_data['results_count']} sources (OPT7 parallel web searches complete)")
 
     # ── DDG FALLBACK: kick in when Tavily returns nothing ────────────────────
     if search_data['results_count'] == 0:
@@ -1490,6 +1612,8 @@ Include 2-3 real competitors. All data must be specific to "{idea}" — no gener
         print(f"[EVIDENCE] report_status={report_status}, score={credibility['overall_score']}, "
               f"verified={len(credibility['verified_fields'])}, inferred={len(credibility['inferred_fields'])}")
 
+        # OPT 1: Store in server-side cache
+        _cache_set(_cache_key, data)
         return data
 
     except Exception as e:
@@ -1731,9 +1855,17 @@ async def _classify_idea(idea: str) -> dict:
     return {"tier": 2, "survival_chance": 14, "investment_verdict": "HARD PASS", "tier_reason": "Classification unavailable."}
 
 @app.post("/vc_roast")
-async def vc_roast(request: VCRoastRequest):
-    user_idea = request.user_idea
+@_rate_limit
+async def vc_roast(req: VCRoastRequest, request: Request = None):
+    user_idea = req.user_idea
     print(f"\n[SKEPTIC] VC ROASTING: {user_idea}")
+
+    # OPT 1: Check server-side cache first
+    _vc_cache_key = f"vc_roast:{user_idea.strip().lower()}"
+    _vc_cached = _cache_get(_vc_cache_key)
+    if _vc_cached:
+        print(f"[CACHE] HIT for vc_roast: {user_idea}")
+        return {**_vc_cached, "cached": True}
 
     # Run web search and classification in parallel
     search_task = asyncio.create_task(asyncio.to_thread(search_web, user_idea, "competitor"))
@@ -1761,26 +1893,23 @@ async def vc_roast(request: VCRoastRequest):
     full_prompt = f"{roast_prompt}{grounding}\nTARGET IDEA: {user_idea}"
 
     try:
-        # PRIMARY: Gemini 2.5 Flash — best reasoning for writing brutal analysis
-        print(f"[SKEPTIC] Roasting with Flash (Tier {tier}, {survival_chance}%, {verdict})...")
-        raw = await asyncio.to_thread(call_gemini, full_prompt, None, _next_gemini_offset())
-        data = clean_json(raw)
+        # OPT 4: Race Gemini + NIM simultaneously
+        print(f"[SKEPTIC] Racing Gemini+NIM (Tier {tier}, {survival_chance}%, {verdict})...")
+        data = await _llm_race(full_prompt, _next_gemini_offset(), _next_nim_offset(), NIM_MODEL_ROAST)
         if not data:
-            # FALLBACK 1: Gemini 2.5 Flash-Lite
-            print(f"[SKEPTIC] Flash failed — trying Flash-Lite fallback...")
+            # FALLBACK: Gemini Flash-Lite
+            print(f"[SKEPTIC] Race failed — trying Flash-Lite fallback...")
             raw = await asyncio.to_thread(call_gemini, full_prompt, SECONDARY_MODEL, _next_gemini_offset())
             data = clean_json(raw)
         if not data:
-            # FALLBACK 2: NIM — independent keys, true safety net
-            print(f"[SKEPTIC] Flash-Lite failed — falling back to NIM (independent keys)...")
-            raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_ROAST, _next_nim_offset())
-            data = clean_json(raw)
-        if not data:
-            raise ValueError("Roast failed — Gemini Flash, Flash-Lite, and NIM all returned empty.")
+            raise ValueError("Roast failed — all LLMs returned empty.")
 
         # Safety net: always enforce classifier values regardless of what the roaster outputs
         data["survival_chance"] = survival_chance
         data["investment_verdict"] = verdict
+
+        # OPT 1: Store in server-side cache
+        _cache_set(_vc_cache_key, data)
         return data
 
     except Exception as e:
@@ -1844,9 +1973,17 @@ class PitchForgeRequest(BaseModel):
     top_competitor: str = ""
 
 @app.post("/pitch_forge")
-async def pitch_forge(request: PitchForgeRequest):
-    user_idea = request.user_idea
+@_rate_limit
+async def pitch_forge(req: PitchForgeRequest, request: Request = None):
+    user_idea = req.user_idea
     print(f"\n[FORGE] PITCH FORGING: {user_idea}")
+
+    # OPT 1: Check server-side cache first
+    _forge_cache_key = f"pitch_forge:{user_idea.strip().lower()}"
+    _forge_cached = _cache_get(_forge_cache_key)
+    if _forge_cached:
+        print(f"[CACHE] HIT for pitch_forge: {user_idea}")
+        return {**_forge_cached, "cached": True}
 
     # Web search grounding — pull live market/competitor context to make pitch credible
     try:
@@ -1856,12 +1993,12 @@ async def pitch_forge(request: PitchForgeRequest):
 
     market_ctx = ""
     # Prefer Validator cache data if passed; fall back to web search
-    if request.market_size or request.growth_rate or request.top_competitor:
+    if req.market_size or req.growth_rate or req.top_competitor:
         market_ctx = f"""
 MARKET CONTEXT (inject these facts into the pitch to make it credible):
-- Market Size: {request.market_size or 'Unknown'}
-- Growth Rate: {request.growth_rate or 'Unknown'}
-- Top Competitor to Position Against: {request.top_competitor or 'Unknown'}
+- Market Size: {req.market_size or 'Unknown'}
+- Growth Rate: {req.growth_rate or 'Unknown'}
+- Top Competitor to Position Against: {req.top_competitor or 'Unknown'}
 USE these numbers in the elevator_pitch and value_proposition where natural.
 """
     elif comp_context:
@@ -1874,21 +2011,19 @@ Reference real market sizes, growth rates, or competitor names where natural.
     full_prompt = f"{PITCH_FORGE_PROMPT}{market_ctx}\nTARGET IDEA: {user_idea}"
     
     try:
-        # PRIMARY: Gemini 2.5 Flash — best pitch language, investor-grade narrative
-        print(f"[FORGE] Trying Gemini 2.5 Flash primary...")
-        raw = await asyncio.to_thread(call_gemini, full_prompt, None, _next_gemini_offset())
-        data = clean_json(raw)
+        # OPT 4: Race Gemini + NIM simultaneously
+        print(f"[FORGE] Racing Gemini+NIM for pitch...")
+        data = await _llm_race(full_prompt, _next_gemini_offset(), _next_nim_offset(), NIM_MODEL_FORGE)
         if not data:
-            # FALLBACK 1: Gemini 2.5 Flash-Lite — same family, still quality pitch output
-            print(f"[FORGE] Flash failed — trying Flash-Lite fallback...")
+            # FALLBACK: Gemini Flash-Lite
+            print(f"[FORGE] Race failed — trying Flash-Lite fallback...")
             raw = await asyncio.to_thread(call_gemini, full_prompt, SECONDARY_MODEL, _next_gemini_offset())
             data = clean_json(raw)
         if not data:
-            # FALLBACK 2: NIM — independent keys, true safety net when Gemini quota exhausted
-            print(f"[FORGE] Flash-Lite failed — falling back to NIM (independent keys)...")
-            raw = await asyncio.to_thread(call_nim, full_prompt, NIM_MODEL_FORGE, _next_nim_offset())
-            data = clean_json(raw)
-        if not data: raise ValueError("Pitch Forge failed — Gemini Flash, Flash-Lite, and NIM all returned empty.")
+            raise ValueError("Pitch Forge failed — all LLMs returned empty.")
+
+        # OPT 1: Store in server-side cache
+        _cache_set(_forge_cache_key, data)
         return data
     except Exception as e:
         print(f"[FORGE] FORGE FAILURE: {e}")
