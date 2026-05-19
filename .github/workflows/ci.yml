@@ -1,4 +1,4 @@
-name: CI — Test & Open PR
+name: "CI - Test and Open PR"
 
 on:
   push:
