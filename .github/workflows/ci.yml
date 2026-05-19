@@ -1,4 +1,4 @@
-name: CI — Test & Open PR
+name: CI - Test and Open PR
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   frontend:
-    name: Frontend — TypeScript + Build
+    name: Frontend - TypeScript + Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
         run: npm run build
 
   backend:
-    name: Backend — Import + Dependency check
+    name: Backend - Import + Dependency check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +54,7 @@ jobs:
         run: python -c "from app.main import app; print('Backend imports OK')"
 
   open-pr:
-    name: Open Pull Request → master
+    name: Open Pull Request to master
     needs: [frontend, backend]
     runs-on: ubuntu-latest
     permissions:
@@ -73,7 +73,7 @@ jobs:
             gh pr create \
               --base master \
               --head "$BRANCH" \
-              --title "ci: $BRANCH → master" \
+              --title "ci: $BRANCH -> master" \
               --body "## CI passed
 
 All checks green:
@@ -81,11 +81,11 @@ All checks green:
 - Frontend build: success
 - Backend imports: OK
 
-**Commit:** \`${{ github.sha }}\`
-**Branch:** \`$BRANCH\`
+**Commit:** ${{ github.sha }}
+**Branch:** $BRANCH
 
 Review and merge to trigger auto-deploy on Render + Vercel."
             echo "PR created for $BRANCH"
           else
-            echo "PR already open for $BRANCH — skipping."
+            echo "PR already open for $BRANCH -- skipping."
           fi
