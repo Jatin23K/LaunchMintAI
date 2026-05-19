@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import api from '../../services/api';
 import {
     ChevronRight, Sparkles, ArrowLeft, Copy, CheckCircle2
@@ -13,6 +13,9 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
     const [error, setError] = useState<string | null>(null);
     const [lastText, setLastText] = useState('');
     const [copiedField, setCopiedField] = useState<string | null>(null);
+    // OPT 5: In-flight deduplication + debounce
+    const inFlightRef = useRef<string | null>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const suggestions = [
         "AI Logistics Optimization",
@@ -24,6 +27,12 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
 
     const runForge = async (text: string = lastText || input) => {
         if (!text) return;
+        // OPT 5: Deduplicate in-flight requests
+        const key = text.trim().toLowerCase();
+        if (inFlightRef.current === key) return;
+        if (loading) return;
+        inFlightRef.current = key;
+
         setLoading(true); setData(null); setError(null);
         setLastText(text);
         setStatus('processing');
@@ -45,7 +54,16 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
             setError('Forge failed. The copywriter walked out. Try again.');
             setStatus('idle');
         }
-        finally { setLoading(false); }
+        finally {
+            setLoading(false);
+            inFlightRef.current = null; // OPT 5: Clear in-flight marker
+        }
+    };
+
+    // OPT 5: Debounced click handler
+    const handleForgeClick = (text?: string) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => runForge(text), 300);
     };
 
     const copyToClipboard = (text: string, field: string) => {
@@ -75,9 +93,9 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
                                     onChange={e => setInput(e.target.value)}
                                     placeholder="What is your startup about?"
                                     className="flex-1 bg-transparent text-white placeholder-gray-500 text-base outline-none h-10"
-                                    onKeyDown={e => e.key === 'Enter' && runForge()}
+                                    onKeyDown={e => e.key === 'Enter' && handleForgeClick()}
                                 />
-                                <button onClick={() => runForge()} className="bg-amber-500 hover:bg-amber-400 text-white px-6 h-10 rounded-full font-bold text-xs tracking-wide transition-transform active:scale-95 flex items-center gap-2">
+                                <button onClick={() => handleForgeClick()} className="bg-amber-500 hover:bg-amber-400 text-white px-6 h-10 rounded-full font-bold text-xs tracking-wide transition-transform active:scale-95 flex items-center gap-2">
                                     GENERATE <ChevronRight className="w-4 h-4" />
                                 </button>
                             </div>
@@ -85,14 +103,14 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
                         <div className="flex flex-col gap-3 items-center w-full">
                             <div className="flex flex-nowrap justify-center gap-3 w-full">
                                 {suggestions.slice(0, 3).map((s) => (
-                                    <button key={s} onClick={() => { setInput(s); runForge(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
+                                    <button key={s} onClick={() => { setInput(s); handleForgeClick(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
                                         {s}
                                     </button>
                                 ))}
                             </div>
                             <div className="flex flex-nowrap justify-center gap-3 w-full">
                                 {suggestions.slice(3, 5).map((s) => (
-                                    <button key={s} onClick={() => { setInput(s); runForge(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
+                                    <button key={s} onClick={() => { setInput(s); handleForgeClick(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
                                         {s}
                                     </button>
                                 ))}

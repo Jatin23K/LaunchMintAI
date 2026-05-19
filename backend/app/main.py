@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any
@@ -14,7 +14,20 @@ load_dotenv()
 # 1. SETUP APP
 app = FastAPI()
 
-from fastapi import Request
+# OPT 3: Rate Limiting
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    _main_limiter = Limiter(key_func=get_remote_address)
+    app.state.limiter = _main_limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    _MAIN_RATE_LIMIT = True
+    print("[INIT] slowapi rate limiting enabled in main.py")
+except ImportError:
+    _MAIN_RATE_LIMIT = False
+    print("[INIT] slowapi not installed in main.py — rate limiting disabled")
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     if request.method == "POST":
@@ -212,7 +225,7 @@ def _execution_score(idea: str) -> float:
     return round(min(score, 10.0), 1)
 
 @app.post("/compare")
-async def compare_ideas(req: CompareRequest):
+async def compare_ideas(request: Request, req: CompareRequest):
     a, b = req.market_a, req.market_b
 
     # ── Parse all signals ───────────────────────────────────────────────────
@@ -324,8 +337,35 @@ async def compare_ideas(req: CompareRequest):
 # We'll mount it here to make it accessible
 
 from app.services.llm_engine import app as llm_app, call_gemini_fast
+from app.services.database import create_db_and_tables, save_report, list_reports, delete_report
 
 #  DS Layer moved to llm_engine.py
+
+# Initialize DB tables (creates SavedReport table if not exists)
+create_db_and_tables()
+
+# OPT 6: Archive endpoints for Battle Room (SQLite-backed)
+@app.post("/archive/save")
+async def archive_save(report: dict):
+    try:
+        saved = save_report(report)
+        return {"success": True, "id": saved.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/archive/list")
+async def archive_list():
+    try:
+        return list_reports(limit=50)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/archive/{idea}")
+async def archive_delete(idea: str):
+    deleted = delete_report(idea)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"success": True}
 
 # Mount the LLM engine's endpoints
 app.mount("/", llm_app)
