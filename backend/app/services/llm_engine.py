@@ -48,6 +48,7 @@ _KEY_POOL = [
         os.environ.get("GEMINI_API_KEY_3"),
         os.environ.get("GEMINI_API_KEY_5"),
         os.environ.get("GEMINI_API_KEY_6"),
+        os.environ.get("GEMINI_API_KEY_7"),
         os.environ.get("GEMINI_API_KEY_2"),
         os.environ.get("GEMINI_API_KEY_1") or os.environ.get("GEMINI_API_KEY"),
         os.environ.get("GEMINI_API_KEY_4"),
