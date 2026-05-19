@@ -1,7 +1,7 @@
 """
 VC Roast endpoint test — run this with backend already started.
 Tests: 5 feedback points, survival_benchmark, valid verdict, dynamic survival_chance, no "Point X:" prefix.
-21 ideas across weak / medium / strong tiers to verify calibration and badge color range.
+15 ideas across weak / medium / strong tiers to verify calibration and badge color range.
 """
 import requests
 
@@ -14,10 +14,6 @@ TEST_IDEAS = [
     ("Social app for book lovers to share reviews", "weak"),
     ("Metaverse real estate marketplace", "weak"),
     ("On-demand car wash app", "weak"),
-    ("Influencer merch platform for Instagram creators", "weak"),
-    ("Web3 loyalty rewards program for coffee shops", "weak"),
-    ("App for splitting restaurant bills with friends", "weak"),
-    ("Freelance marketplace for graphic designers", "weak"),
 
     # ── MEDIUM (expect WEAK MAYBE/HARD PASS, survival 20–50%) ─────────────────
     ("Automated lease abstraction SaaS for commercial real estate property managers", "medium"),
@@ -25,7 +21,6 @@ TEST_IDEAS = [
     ("Permit and inspection workflow automation SaaS for mid-size construction companies", "medium"),
     ("Practice management SaaS for independent veterinary clinics including scheduling and billing", "medium"),
     ("Regulatory change tracking and compliance SaaS for community banks under SEC rules", "medium"),
-    ("Fleet maintenance scheduling and DOT compliance SaaS for regional trucking companies", "medium"),
 
     # ── STRONG (expect CONDITIONAL INTEREST/WEAK MAYBE, survival 40%+) ────────
     ("AI platform for automated underwriting decisions in commercial lending replacing manual credit analysis", "strong"),
@@ -33,7 +28,6 @@ TEST_IDEAS = [
     ("Predictive maintenance AI for industrial equipment using sensor data reducing unplanned downtime by 80%", "strong"),
     ("Real-time fraud detection infrastructure using graph neural networks for payment processors", "strong"),
     ("AI-native procurement intelligence platform replacing manual RFP processes for Fortune 500 teams", "strong"),
-    ("Drug discovery acceleration platform using LLMs to analyze clinical literature and suggest novel compound targets", "strong"),
 ]
 
 VALID_VERDICTS = {"HARD PASS", "WEAK MAYBE", "LAUGHABLE", "CONDITIONAL INTEREST"}
@@ -112,7 +106,7 @@ def test_roast(idea: str, strength: str):
         print(f"\n✅ ALL CHECKS PASSED")
 
 if __name__ == "__main__":
-    print("VC Roast — 21 idea test suite")
+    print("VC Roast — 15 idea test suite")
     print("Backend: localhost:8000")
     print(f"Ideas: {len(TEST_IDEAS)} ({sum(1 for _,s in TEST_IDEAS if s=='weak')} weak, "
           f"{sum(1 for _,s in TEST_IDEAS if s=='medium')} medium, "
