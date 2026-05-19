@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import api from '../../services/api';
 import {
-    ChevronRight, Sparkles, Loader2, ArrowLeft, Copy, CheckCircle2
+    ChevronRight, Sparkles, ArrowLeft, Copy, CheckCircle2
 } from 'lucide-react';
 import { PitchForgeData } from '../../types';
-import { API_BASE_URL } from '../../config';
 import { getCachedResult } from '../../services/cache';
 
 function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 'idle' | 'processing' | 'active') => void }) {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<PitchForgeData | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [lastText, setLastText] = useState('');
     const [copiedField, setCopiedField] = useState<string | null>(null);
 
     const suggestions = [
@@ -21,9 +22,10 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
         "Quantum Computing SaaS"
     ];
 
-    const runForge = async (text: string = input) => {
+    const runForge = async (text: string = lastText || input) => {
         if (!text) return;
-        setLoading(true); setData(null);
+        setLoading(true); setData(null); setError(null);
+        setLastText(text);
         setStatus('processing');
         try {
             // Pull market data from Validator cache to ground the pitch
@@ -40,6 +42,7 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
             setStatus('active');
         } catch (err) {
             console.error(err);
+            setError('Forge failed. The copywriter walked out. Try again.');
             setStatus('idle');
         }
         finally { setLoading(false); }
@@ -100,15 +103,43 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
             )}
 
             {loading && (
-                <div className="flex flex-col items-center justify-center py-20">
-                    <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
-                    <div className="text-amber-500 font-bold mt-4 tracking-widest animate-pulse">CRAFTING NARRATIVE...</div>
+                <div className="animate-pulse w-full max-w-5xl px-6 pb-20 mt-10">
+                    {/* tagline banner skeleton */}
+                    <div className="bg-gradient-to-br from-amber-500/40 to-orange-600/40 p-0.5 rounded-3xl mb-12">
+                        <div className="bg-[#050914] rounded-[22px] p-10 text-center space-y-3">
+                            <div className="h-6 bg-slate-800 rounded-full w-2/3 mx-auto"></div>
+                            <div className="h-6 bg-slate-800 rounded-full w-1/3 mx-auto"></div>
+                        </div>
+                    </div>
+                    {/* 2x2 cards skeleton */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl space-y-3">
+                                <div className="h-3 bg-slate-800 rounded-full w-24 mb-4"></div>
+                                <div className="h-3 bg-slate-800 rounded-full w-full"></div>
+                                <div className="h-3 bg-slate-800 rounded-full w-4/5"></div>
+                                <div className="h-3 bg-slate-800 rounded-full w-3/5"></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {error && !loading && (
+                <div className="flex flex-col items-center gap-3 py-10">
+                    <p className="text-amber-400 text-sm font-bold">{error}</p>
+                    <button
+                        onClick={() => runForge()}
+                        className="text-amber-400 hover:text-amber-300 text-sm font-black tracking-wide border border-amber-500/30 px-4 py-1.5 rounded-full hover:border-amber-400/60 transition-all"
+                    >
+                        ↻ Retry Forge
+                    </button>
                 </div>
             )}
 
             {data && (
                 <div className="animate-in slide-in-from-bottom-20 fade-in duration-700 w-full max-w-5xl px-6 pb-20 mt-10">
-                    <button onClick={() => { setData(null); setStatus('idle'); }} className="mb-8 flex items-center gap-2 text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4" /> New Deck</button>
+                    <button onClick={() => { setData(null); setError(null); setLastText(''); setStatus('idle'); }} className="mb-8 flex items-center gap-2 text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4" /> New Deck</button>
                     <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-0.5 rounded-3xl mb-12 shadow-[0_0_60px_rgba(245,158,11,0.2)]">
                         <div className="bg-[#050914] rounded-[22px] p-10 text-center relative">
                             <h2 className="text-3xl md:text-5xl font-black text-white italic">"{data.tagline}"</h2>
@@ -116,14 +147,19 @@ function PitchForgeApp({ onBack, setStatus }: { onBack: () => void, setStatus: (
                     </div>
                     <div className="grid md:grid-cols-2 gap-6">
                         {[
-                            { title: 'Elevator Pitch', content: data.elevator_pitch, id: 'elevator' },
-                            { title: 'Value Prop', content: data.value_proposition, id: 'value' },
-                            { title: 'Viral Tweet', content: data.tweet_thread_hook, id: 'tweet' },
-                            { title: 'Subject Line', content: data.cold_email_subject, id: 'email' }
+                            { title: 'Elevator Pitch', content: data.elevator_pitch, id: 'elevator', charLimit: null },
+                            { title: 'Value Prop', content: data.value_proposition, id: 'value', charLimit: null },
+                            { title: 'Viral Tweet', content: data.tweet_thread_hook, id: 'tweet', charLimit: 280 },
+                            { title: 'Subject Line', content: data.cold_email_subject, id: 'email', charLimit: null }
                         ].map((item) => (
                             <div key={item.id} className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-amber-500/30 transition-all group relative">
                                 <div className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles className="w-3 h-3" /> {item.title}</div>
                                 <p className="text-slate-300 leading-relaxed">{item.content}</p>
+                                {item.charLimit && (
+                                    <div className={`mt-3 text-[10px] font-bold ${item.content.length > item.charLimit ? 'text-red-400' : 'text-slate-600'}`}>
+                                        {item.content.length}/{item.charLimit} chars
+                                    </div>
+                                )}
                                 <button onClick={() => copyToClipboard(item.content, item.id)} className="absolute top-6 right-6 text-slate-600 hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-all">
                                     {copiedField === item.id ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                                 </button>

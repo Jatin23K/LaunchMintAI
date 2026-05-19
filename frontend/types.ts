@@ -640,6 +640,7 @@ export interface VCRoastData {
   competitor_alert: string;
   investment_verdict: string;
   survival_chance: number;
+  survival_benchmark?: string;
 }
 
 // ── Evidence & Provenance (Validator credibility layer) ───────────────────────
