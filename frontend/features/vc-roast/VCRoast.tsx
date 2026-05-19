@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
 import api from '../../services/api';
-import { ChevronRight, Loader2, ArrowLeft, AlertTriangle, Skull, Flame } from 'lucide-react';
+import { ChevronRight, ArrowLeft, AlertTriangle, Skull, Flame } from 'lucide-react';
 import { VCRoastData } from '../../types';
 import { API_BASE_URL } from '../../config';
+
+function getRiskLabel(chance: number): { label: string; color: string; bg: string; border: string } {
+    if (chance <= 15) return { label: 'Critical Risk', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' };
+    if (chance <= 35) return { label: 'High Risk', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' };
+    if (chance <= 55) return { label: 'Moderate Risk', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' };
+    if (chance <= 75) return { label: 'Viable', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' };
+    return { label: 'Strong Potential', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' };
+}
 
 function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 'idle' | 'processing' | 'active') => void }) {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<VCRoastData | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [lastText, setLastText] = useState('');
 
     const suggestions = [
         "Creator Economy FinTech",
@@ -17,9 +27,10 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
         "Sustainable AgriTech"
     ];
 
-    const runRoast = async (text: string = input) => {
+    const runRoast = async (text: string = lastText || input) => {
         if (!text) return;
-        setLoading(true); setData(null);
+        setLoading(true); setData(null); setError(null);
+        setLastText(text);
         setStatus('processing');
         try {
             const response = await api.post(`/vc_roast`, { user_idea: text }, { retry: 2 } as any);
@@ -27,6 +38,7 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
             setStatus('active');
         } catch (err) {
             console.error(err);
+            setError('Roast failed. The servers chickened out. Try again.');
             setStatus('idle');
         }
         finally { setLoading(false); }
@@ -81,15 +93,69 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
             )}
 
             {loading && (
-                <div className="flex flex-col items-center justify-center py-20">
-                    <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
-                    <div className="text-red-500 font-bold mt-4 tracking-widest animate-pulse">ANALYZING FLAWS...</div>
+                <div className="animate-pulse w-full max-w-5xl px-6 pb-20 mt-10">
+                    {/* kill_shot banner skeleton */}
+                    <div className="bg-gradient-to-br from-red-600/40 to-orange-600/40 p-0.5 rounded-3xl mb-12">
+                        <div className="bg-[#050914] rounded-[22px] p-10 text-center space-y-3">
+                            <div className="h-6 bg-slate-800 rounded-full w-3/4 mx-auto"></div>
+                            <div className="h-6 bg-slate-800 rounded-full w-1/2 mx-auto"></div>
+                        </div>
+                    </div>
+
+                    {/* feedback + survival grid skeleton */}
+                    <div className="grid md:grid-cols-3 gap-6 mb-12">
+                        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl md:col-span-2 space-y-4">
+                            <div className="h-3 bg-slate-800 rounded-full w-32 mb-6"></div>
+                            {[...Array(5)].map((_, i) => (
+                                <div key={i} className="flex gap-4 p-4 rounded-xl bg-black/20 border border-slate-800">
+                                    <div className="h-4 w-8 bg-red-900/50 rounded shrink-0"></div>
+                                    <div className="flex-1 space-y-2">
+                                        <div className="h-3 bg-slate-800 rounded-full w-full"></div>
+                                        <div className="h-3 bg-slate-800 rounded-full w-4/5"></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col items-center justify-center gap-4">
+                            <div className="h-3 bg-slate-800 rounded-full w-24"></div>
+                            <div className="h-24 w-32 bg-slate-800 rounded-xl"></div>
+                            <div className="h-5 w-28 bg-slate-800 rounded-full"></div>
+                            <div className="h-3 bg-slate-800 rounded-full w-full"></div>
+                            <div className="h-3 bg-slate-800 rounded-full w-4/5"></div>
+                        </div>
+                    </div>
+
+                    {/* verdict + competitor skeleton */}
+                    <div className="bg-red-950/20 border-2 border-red-500/20 p-10 rounded-[2.5rem] space-y-4">
+                        <div className="h-3 bg-slate-800 rounded-full w-32"></div>
+                        <div className="h-8 bg-slate-800 rounded-full w-48"></div>
+                        <div className="flex gap-3 p-4 rounded-2xl bg-black/40 border border-red-500/10 mt-6">
+                            <div className="h-6 w-6 bg-red-900/50 rounded shrink-0"></div>
+                            <div className="flex-1 space-y-2">
+                                <div className="h-3 bg-slate-800 rounded-full w-32"></div>
+                                <div className="h-3 bg-slate-800 rounded-full w-full"></div>
+                                <div className="h-3 bg-slate-800 rounded-full w-3/4"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {error && !loading && (
+                <div className="flex flex-col items-center gap-3 py-10">
+                    <p className="text-red-400 text-sm font-bold">{error}</p>
+                    <button
+                        onClick={() => runRoast()}
+                        className="text-red-400 hover:text-red-300 text-sm font-black tracking-wide border border-red-500/30 px-4 py-1.5 rounded-full hover:border-red-400/60 transition-all"
+                    >
+                        ↻ Retry Roast
+                    </button>
                 </div>
             )}
 
             {data && (
                 <div className="animate-in slide-in-from-bottom-20 fade-in duration-700 w-full max-w-5xl px-6 pb-20 mt-10">
-                    <button onClick={() => { setData(null); setStatus('idle'); }} className="mb-8 flex items-center gap-2 text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4" /> New Roast</button>
+                    <button onClick={() => { setData(null); setError(null); setLastText(''); setStatus('idle'); }} className="mb-8 flex items-center gap-2 text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4" /> New Roast</button>
                     <div className="bg-gradient-to-br from-red-600 to-orange-600 p-0.5 rounded-3xl mb-12 shadow-[0_0_60px_rgba(220,38,38,0.2)]">
                         <div className="bg-[#050914] rounded-[22px] p-10 text-center relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-pulse"></div>
@@ -103,7 +169,7 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
                             <div className="space-y-4">
                                 {data.brutal_feedback.map((point, i) => (
                                     <div key={i} className="flex gap-4 p-4 rounded-xl bg-black/20 border border-slate-800">
-                                        <span className="text-red-500 font-black">#0{i+1}</span>
+                                        <span className="text-red-500 font-black shrink-0">#{String(i + 1).padStart(2, '0')}</span>
                                         <p className="text-slate-300">{point}</p>
                                     </div>
                                 ))}
@@ -111,8 +177,13 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
                         </div>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col items-center justify-center text-center">
                             <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Survival Probability</div>
-                            <div className="text-8xl font-black text-red-500 tracking-tighter mb-4">{data.survival_chance}%</div>
-                            <div className="px-4 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-black uppercase">Critical Risk</div>
+                            <div className={`text-8xl font-black tracking-tighter mb-4 ${getRiskLabel(data.survival_chance).color}`}>{data.survival_chance}%</div>
+                            <div className={`px-4 py-1 rounded-full ${getRiskLabel(data.survival_chance).bg} border ${getRiskLabel(data.survival_chance).border} ${getRiskLabel(data.survival_chance).color} text-[10px] font-black uppercase mb-3`}>
+                                {getRiskLabel(data.survival_chance).label}
+                            </div>
+                            {data.survival_benchmark && (
+                                <p className="text-slate-500 text-[10px] leading-relaxed">{data.survival_benchmark}</p>
+                            )}
                         </div>
                     </div>
 
