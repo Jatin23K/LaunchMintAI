@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, ShieldCheck, X, CheckCircle2, Swords, Loader2, Trophy, ArrowLeft } from 'lucide-react';
+import { Activity, ShieldCheck, X, CheckCircle2, Swords, Trophy, ArrowLeft } from 'lucide-react';
 import { RealData } from '../../types';
 import api from '../../services/api';
 
@@ -134,14 +134,13 @@ function DeltaAnalysisApp({ archive, setArchive }: { archive: RealData[], setArc
                                 {selectedIds.length === 0 ? 'Select 2 ideas to battle' : 'Select 1 more idea'}
                             </p>
                         )}
-                        {selectedIds.length === 2 && (
+                        {selectedIds.length === 2 && !loading && (
                             <button
                                 onClick={runBattle}
-                                disabled={loading}
-                                className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black px-10 py-4 rounded-full font-black text-lg flex items-center gap-3 shadow-[0_0_40px_rgba(6,182,212,0.3)] transition-all active:scale-95"
+                                className="bg-cyan-500 hover:bg-cyan-400 text-black px-10 py-4 rounded-full font-black text-lg flex items-center gap-3 shadow-[0_0_40px_rgba(6,182,212,0.3)] transition-all active:scale-95"
                             >
-                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Swords className="w-5 h-5" />}
-                                {loading ? 'BATTLING...' : 'BATTLE'}
+                                <Swords className="w-5 h-5" />
+                                BATTLE
                             </button>
                         )}
                         {error && (
@@ -156,6 +155,38 @@ function DeltaAnalysisApp({ archive, setArchive }: { archive: RealData[], setArc
                             </div>
                         )}
                     </div>
+
+                    {/* Skeleton — mirrors exact result layout */}
+                    {loading && (
+                        <div className="animate-pulse space-y-6 mt-4">
+                            {/* Winner banner skeleton */}
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 flex flex-col items-center gap-4">
+                                <div className="w-10 h-10 bg-slate-800 rounded-full" />
+                                <div className="h-3 bg-slate-800 rounded-full w-20" />
+                                <div className="h-7 bg-slate-800 rounded-full w-2/3" />
+                                <div className="h-3 bg-slate-800 rounded-full w-full max-w-lg" />
+                                <div className="h-3 bg-slate-800 rounded-full w-4/5 max-w-md" />
+                            </div>
+                            {/* Scorecard skeleton */}
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 space-y-4">
+                                <div className="h-3 bg-slate-800 rounded-full w-40 mb-2" />
+                                {/* Column headers */}
+                                <div className="grid grid-cols-3 gap-4 mb-2">
+                                    <div className="h-2 bg-slate-800 rounded-full" />
+                                    <div className="h-2 bg-slate-800 rounded-full" />
+                                    <div className="h-2 bg-slate-800 rounded-full" />
+                                </div>
+                                {/* 5 score rows */}
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={i} className="grid grid-cols-3 gap-4 py-3 border-t border-slate-800 items-center">
+                                        <div className="h-2 bg-slate-800 rounded-full ml-auto w-3/4" />
+                                        <div className="h-2 bg-slate-800 rounded-full mx-auto w-2/3" />
+                                        <div className="h-2 bg-slate-800 rounded-full w-3/4" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Battle Result */}
                     {battleResult && !battleResult.error && (
