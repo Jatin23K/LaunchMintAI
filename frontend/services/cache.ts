@@ -42,6 +42,26 @@ export const getCachedResult = (idea: string): {
   }
 };
 
+const MAX_CACHE_ENTRIES = 20;
+
+const enforceMaxEntries = () => {
+  const keys = Object.keys(localStorage).filter(k => k.startsWith(CACHE_KEY_PREFIX));
+  if (keys.length <= MAX_CACHE_ENTRIES) return;
+  // Find and evict the oldest entry
+  let oldestKey = keys[0];
+  let oldestTs = Infinity;
+  keys.forEach(k => {
+    try {
+      const entry = JSON.parse(localStorage.getItem(k) || '{}');
+      if ((entry.timestamp ?? Infinity) < oldestTs) {
+        oldestTs = entry.timestamp;
+        oldestKey = k;
+      }
+    } catch {}
+  });
+  localStorage.removeItem(oldestKey);
+};
+
 export const setCachedResult = (
   idea: string,
   data: RealData,
@@ -60,4 +80,5 @@ export const setCachedResult = (
     timestamp: Date.now()
   };
   localStorage.setItem(key, JSON.stringify(cacheObj));
+  enforceMaxEntries(); // OPT 7: evict oldest if over 20 entries
 };
