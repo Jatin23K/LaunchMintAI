@@ -1,4 +1,4 @@
-# LaunchMintAI — Battle Room: Complete Technical Explainer
+﻿# LaunchMintAI — Battle Room: Complete Technical Explainer
 ### For Applied Data Scientist Interview Preparation
 ---
 
@@ -602,5 +602,140 @@ Add a "Share this battle" button that generates a shareable URL or PDF snapshot 
 
 ---
 
-*Document generated: 2026-05-18*
+---
+
+## 10. ROLE-SPECIFIC INTERVIEW QUICK REFERENCE
+
+### If you are interviewing for Applied Data Scientist
+
+Lead with these 3 stories:
+1. **_execution_score() as a rule-based classifier** — "The execution score function is essentially a lightweight feature-based classifier — keyword signals for B2B, AI, and idea specificity map to a numeric output. Same pattern as XGBoost feature engineering, just without the training step."
+2. **_parse_tam() regex design** — "Parsing `$5.4B` vs `$850M` vs `$2.1T` requires unit-aware regex. I normalize everything to billions for consistent comparison. The edge cases — `TH` excluded from trillion match, `MI`/`MO` excluded from million match — are examples of how real data is messy."
+3. **Investor appeal weights** — "TAM 40%, growth 30%, safety 30% — these weights reflect how seed investors actually prioritize. TAM is the biggest filter, growth signals timing, risk modulates conviction. A startup in a $50B growing 5% market has different appeal than one in a $2B growing 80% market."
+
+### If you are interviewing for Forward Deployed Engineer
+
+Lead with these 3 stories:
+1. **Gemini output post-processing** — "Gemini returns escaped quotes and sometimes wraps text in JSON. I strip both deterministically before showing the verdict. The lesson: never trust LLM output formatting in production."
+2. **Static fallback verdict** — "If Gemini fails entirely, a static sentence is generated from the parsed data fields. The user always sees a verdict — never an error in place of a result."
+3. **Archive-based architecture** — "Battle Room makes zero API calls to fetch data — it reads from localStorage. This means it works even if the backend is offline. The only backend call is /compare for scoring and verdict. Offline resilience by design."
+
+---
+
+## 11. FORWARD DEPLOYED ENGINEER — INTERVIEW Q&A
+
+**Q: A client says "Battle Room picked the wrong winner — Idea B is clearly better." How do you respond?**
+
+A: First, walk through the scorecard with them — show which 3 of 5 categories their preferred idea lost and why. The scoring is transparent and deterministic, so you can explain exactly what happened: "Idea A won Market Size because $5.4B > $3.24B, it won Growth Rate because 40% > 12.7%, and those two wins plus the Investor Appeal composite gave it the majority." If the client disagrees with the weights, that's a valid product conversation — the current 40/30/30 weighting was designed for seed investors. If their use case is "we're already funded and optimizing for execution," the weights should change. The scoring is not a black box — it's five explicit formulas the client can audit.
+
+**Q: The client wants to compare 3 ideas, not just 2. How do you implement this?**
+
+A: Pairwise round-robin comparison. For 3 ideas (A, B, C), run three /compare calls: A vs B, A vs C, B vs C. Each call returns a winner. Tally the wins: the idea with 2 wins is the champion, the idea with 0 wins is eliminated. If each wins one (circular: A beats B, B beats C, C beats A) — a genuine triangle — fall back to highest investor_appeal composite score as the tiebreaker. Frontend change: allow up to 3 selections, fire 3 parallel POST /compare calls, display a 3-column scorecard with aggregate win counts. Backend change: none required — /compare already handles any two ideas independently.
+
+**Q: How do you add a "share battle results" feature for client demos?**
+
+A: Two approaches. Quick (1 day): encode the battle result as a base64 URL parameter — the frontend reads the URL on load, skips the battle step, and renders the scorecard directly. This works without any backend changes and the URL is shareable. Proper (3 days): add a POST /save_battle endpoint that stores the result in a short UUID → JSON map (Redis or file-based), returns a short URL like `/battle/abc123`. Frontend hits GET /battle/abc123 to retrieve it. The short URL approach is more reliable (no URL length limits) and lets you add analytics — how many times was each result viewed. For a portfolio project, the base64 approach is sufficient and impressive for demos.
+
+**Q: A client's risk scores are showing 0.0/10 in the scorecard. How do you debug this?**
+
+A: This is the exact Issue 2 that was fixed in development. Root cause: `god_mode.risk_score` stores the string "MEDIUM" (or "HIGH"), not a number. The `_parse_pct()` function tries regex extraction on the string, finds no digits, returns 0.0. The fix is the text-to-number mapping in `_parse_pct()`. To diagnose in production: (1) Add a log line: `logger.debug(f"risk_raw={val}, risk_parsed={result}")`. (2) Check what value is actually stored in localStorage for `god_mode.risk_score` — open DevTools → Application → Local Storage → look at the archive entry. (3) If the value is "MEDIUM" and the map doesn't have "MEDIUM", check for case differences — localStorage might store "medium" lowercase while the map keys are uppercase. Fix: normalize to `.upper()` before the map lookup.
+
+**Q: How would you add a "team quality" signal to the scoring?**
+
+A: This requires a new input field and a new scoring category. Frontend: add a text area "Describe your founding team" to the archive card. Backend: add `team_a: str` and `team_b: str` to `CompareRequest`. Add `_team_score(team_description) → float` that keyword-matches for: domain expertise signals (+1.5: "10 years in", "former", "PhD", "ex-Google"), founding team size signals (+0.5: "co-founder"), and previous startup experience (+1.0: "founded", "exited", "YC"). Update the scorecard to 6 categories — maintaining the odd number for majority voting is important (ties are impossible with 5 or 7 categories, possible with 6). If 6 categories are kept, add a secondary tie-breaker after TAM: highest team score. The cleaner solution is to go to 7 categories. This maintains the no-tie guarantee.
+
+**Q: A client asks why you use localStorage instead of a database. How do you justify it?**
+
+A: For a portfolio project with a single user, localStorage is the right choice — zero infrastructure, zero cost, works offline, instant read/write. For a multi-user production system, the answer changes immediately: localStorage is per-browser, per-device, and gets cleared when users clear cache. A proper system would use: (1) a backend database (PostgreSQL or Firestore) to store reports server-side, (2) user accounts for report ownership, (3) a GET /reports/{user_id} endpoint for retrieving the archive. The current architecture was explicitly designed for portfolio demonstration — it's a conscious trade-off, not an oversight. If I were building this for production, the archive would be the first thing to move to a server-side database.
+
+**Q: The BATTLING... spinner appears and then immediately shows "Battle failed." A client is watching. What do you say?**
+
+A: Stay calm — this is why the retry button exists. "The AI verdict generator hit a brief rate limit — let me retry, it'll be back in a moment." Click ↻ Retry Battle. While retrying, explain the architecture: "The winner is already determined by math — that part is instant. The AI writes a two-sentence explanation of why the winner wins, and that part occasionally hits a quota limit." This framing turns a failure into a demonstration of the system's resilience — the data is always there, only the narrative generation is affected. If the retry also fails, show the scorecard manually — "Here's exactly why Idea A won: larger TAM at $5.4B versus $3.24B, faster growth rate at 40% versus 12.7%, and a higher combined investor appeal index."
+
+**Q: How does Battle Room fit into a client's investment workflow?**
+
+A: The natural workflow is: validate 5-10 ideas with the Validator tab (30 minutes), save the best 4-5 to archive, then run Battle Room comparisons to narrow to 2 finalists. The key value is objectivity — the scorecard uses market data that was already verified during validation, not the client's intuition. For an investor, this workflow replaces a 2-hour debate about "which idea do we pursue" with a 5-minute structured comparison. The Gemini verdict gives them a sentence to use in their thesis. For a founder, it's a forcing function — you have to actually validate the ideas before you can battle them.
+
+---
+
+## 12. PRODUCTION SCENARIOS & DEBUGGING PLAYBOOK
+
+### Scenario A: "Battle failed" on every attempt
+
+**Symptoms:** Every click of BATTLE immediately shows "Battle failed. Try again." with no network request appearing in DevTools.
+
+**Root cause options:**
+1. Frontend is not sending both idea strings — check `selectedIds.length < 2` guard
+2. Backend `/compare` is returning 500 — check for import error in `main.py` (did `call_gemini_fast` import succeed?)
+3. CORS issue — `/compare` endpoint is in `main.py` but the CORS middleware might not cover it if mounted differently
+
+**Debug steps:**
+1. Open DevTools → Network → click BATTLE → look for the POST /compare request
+2. If no request appears: JavaScript error before the fetch — check Console tab
+3. If request appears with 500: read the backend error log — likely an import error or Pydantic validation failure
+4. If request appears with 404: the `/compare` route is not registered — check `main.py` for `@app.post("/compare")`
+
+---
+
+### Scenario B: "Investor Appeal Index shows 0.0 for both ideas"
+
+**Symptoms:** Investor Appeal card shows "Index 0.0" for both A and B, with A always winning (tie → A by `>=` condition).
+
+**Root cause:** Both `_parse_tam()` and `_parse_pct()` returned 0.0, making `inv = (0.1 × 0.4) + (0.1 × 0.3) + (10 × 0.3) = 0.04 + 0.03 + 3.0 = 3.07` — wait, 10 - 0 = 10, so safety contributes 3.0 and everything else is near-zero. Both ideas get the same value.
+
+**Actual root cause:** TAM values are stored in a format `_parse_tam()` can't parse — e.g. "5.4 billion" instead of "$5.4B".
+
+**Debug steps:**
+1. Log the raw TAM string: `logger.debug(f"tam_a_raw={market_a.get('forecast_tam')}")`
+2. Check the localStorage archive — what format does `forecast_tam` actually store?
+3. Update `_parse_tam()` to handle "X billion" format: `re.search(r'(\d+\.?\d*)\s*billion', val.lower())`
+
+---
+
+### Scenario C: "Verdict shows raw JSON: {'explanation': '...'}"
+
+**Symptoms:** The winner verdict card shows literal JSON text instead of clean prose.
+
+**Root cause:** The Gemini JSON-unwrapping post-processing is failing. Either:
+1. The JSON has nested structure: `{"verdict": {"text": "..."}}`
+2. The `json.loads()` call is raising an exception that's being silently swallowed
+
+**Debug steps:**
+1. Add logging before and after the post-processing chain:
+```python
+logger.debug(f"verdict_raw={verdict[:200]}")
+# ... post-processing ...
+logger.debug(f"verdict_clean={clean_verdict[:200]}")
+```
+2. If the structure is `{"verdict": {"text": "..."}}`, update the unwrapper:
+```python
+def _extract_str(obj):
+    if isinstance(obj, str): return obj
+    if isinstance(obj, dict): return _extract_str(next(iter(obj.values())))
+    return str(obj)
+```
+
+---
+
+## 13. STAKEHOLDER COMMUNICATION SCRIPTS
+
+### Explaining to a Non-Technical Founder
+
+> "Battle Room compares two ideas across five dimensions — market size, growth rate, competition level, execution difficulty, and investor appeal. The winner is whoever wins the majority, like a panel of five judges. It's not the AI picking a favourite — it's math applied to the data we already collected when we validated each idea. The AI writes one sentence explaining why, but the actual decision is deterministic."
+
+### Explaining the Weights to a VC
+
+> "Investor appeal is weighted 40% market size, 30% growth rate, 30% inverse risk. Those weights mirror how seed investors actually filter — TAM is the first filter, growth signals whether you're entering at the right moment, and risk tolerance determines conviction. A startup in a $50B market growing 5% loses to one in a $5B market growing 80% on the growth dimension but may win on TAM. The composite captures both."
+
+### Explaining to a Hiring Manager (DS Position)
+
+> "The scoring logic is rule-based, not ML. But the design decisions are all data-science thinking: normalizing TAM to a common unit (billions) for comparison, handling the B/M/T suffix parsing, text-based feature extraction for execution score. The `_execution_score()` function is essentially a hand-coded rule-based classifier — same concept as XGBoost feature engineering, just with explicit rules instead of learned weights. I could replace it with a trained model if I had labeled execution outcome data."
+
+### Explaining to a Hiring Manager (FDE Position)
+
+> "The key design decision in Battle Room is: the winner is determined before Gemini is ever called. The scoring is pure Python math — no LLM involvement. Gemini only writes the 2-sentence narrative. If Gemini fails entirely, a static fallback sentence is generated from the data. This means a Gemini outage degrades the narrative quality slightly but never breaks the core feature. That's the reliability principle I apply across the whole system."
+
+---
+
+*Document updated: 2026-05-19 — covers Applied Data Scientist + Forward Deployed Engineer interview preparation*
 *System: LaunchMintAI v1 — Applied DS Portfolio Project*
