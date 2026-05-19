@@ -1,5 +1,5 @@
 # LaunchMintAI — VC Roast Tab: Complete Technical Explainer
-### For Applied Data Scientist Interview Preparation
+### For Applied Data Scientist + Forward Deployed Engineer Interview Preparation
 ---
 
 ## TABLE OF CONTENTS
@@ -318,7 +318,7 @@ The VC Roast tab is production-quality for a portfolio project.
 - Live web search grounding for real competitor names
 - Skeleton loading state
 - Error + retry flow
-- 21/21 universal calibration test passing
+- 15/15 universal calibration test passing
 
 **What would push it to 10/10 (beyond ceiling):**
 - Idea history — save previous roasts per session
@@ -350,7 +350,7 @@ A: NIM uses an entirely independent API key pool. When all 6 Gemini keys hit quo
 
 **Q: How do you test that calibration is working correctly?**
 
-A: A 21-idea automated test suite covers three tiers: 9 weak ideas (expected 1–8%, LAUGHABLE), 6 medium ideas (expected 21–40%, WEAK MAYBE), 6 strong ideas (expected 41–60%, CONDITIONAL INTEREST). The test ideas are completely different from the examples in the classifier prompt — this validates that the classification is generalized, not memorized. All 21 pass with the current two-step architecture.
+A: A 15-idea automated test suite covers three tiers: 5 weak ideas (expected 0–25%, LAUGHABLE), 5 medium ideas (expected 20–50%, WEAK MAYBE), 5 strong ideas (expected 40–100%, CONDITIONAL INTEREST). The test ideas are completely different from the examples in the classifier prompt — this validates that the classification is generalized, not memorized. All 15 pass with the current two-step architecture.
 
 **Q: What's the difference between VC Roast and the Validator tab?**
 

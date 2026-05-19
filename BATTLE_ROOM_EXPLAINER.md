@@ -1,5 +1,5 @@
 ﻿# LaunchMintAI — Battle Room: Complete Technical Explainer
-### For Applied Data Scientist Interview Preparation
+### For Applied Data Scientist + Forward Deployed Engineer Interview Preparation
 ---
 
 ## TABLE OF CONTENTS
