@@ -980,5 +980,160 @@ The ceiling is imposed by **free-tier API limitations**, not by architecture lim
 
 ---
 
-*Document generated: 2026-05-18*
+---
+
+## 9. ROLE-SPECIFIC INTERVIEW QUICK REFERENCE
+
+### If you are interviewing for Applied Data Scientist
+
+Lead with these 3 stories in this order:
+1. **XGBoost sector priority order** — "I found that 'AI-powered LegalTech' was being classified as generic AI sector. Fixed it by changing classification priority order to check specific sectors before generic AI."
+2. **Monte Carlo vs point estimate** — "A single formula says 24 months runway. Monte Carlo says 90% chance of surviving past 8 months, 50% chance past 36. That distributional output is how real investors think."
+3. **Synthetic training data honesty** — "The model is trained on synthetic data. I disclose this explicitly in every output. It's directionally correct, not actuarial. The P1/P2 post-processing overrides correct for known biases."
+
+### If you are interviewing for Forward Deployed Engineer
+
+Lead with these 3 stories in this order:
+1. **NIM health check pattern** — "On startup, ping NIM with an 8-second timeout. If it fails, skip NIM on every subsequent call. This saves 15 seconds × 20 extensions = 5 minutes on every degraded report."
+2. **Fallback chain philosophy** — "Partial data > no data > crash. Every layer has a fallback. Every fallback has a fallback. The user always gets something."
+3. **Post-processing guardrails** — "I don't trust the LLM for numbers. Burn rate < $50K gets overridden in code. Exit valuation > $5B gets capped in code. Deterministic code corrects LLM mistakes."
+
+---
+
+## 10. FORWARD DEPLOYED ENGINEER — INTERVIEW Q&A
+
+**Q: A client says "the report is taking 4 minutes to load and my team is complaining." How do you diagnose this?**
+
+A: Four-step diagnosis. First, check the backend logs for which step is slowest — is it the market search (Serper/Exa timeouts?), the main Gemini call (quota hit?), or the extensions (NIM degraded?). Second, check the NIM health status flag `_nim_degraded` — if NIM is timing out on every extension and the health check didn't catch it at startup, that alone adds 15s × 20 extensions = 5 minutes. Third, check Gemini key rotation — if one exhausted key is always tried first, every call burns 5-10 seconds before falling back. Fourth, check if `Promise.allSettled()` is actually in place on the frontend — if extensions are serialized instead of parallel, 20 extensions × 8s each = 160s. Fix order: NIM health check → key rotation order → frontend parallelism → timeout tuning.
+
+**Q: A client wants this system integrated into their internal Slack bot. How do you approach that?**
+
+A: Two integration paths depending on what they need. If they want the full report, I expose the `/analyze` endpoint with an API key, they POST the idea from Slack's slash command handler, and stream the response back as a formatted message. If they want just the quick verdict, I expose a lightweight `/vc_roast` endpoint — it's a single-turn API call, returns in under 30 seconds, and the 6 fields map cleanly to a Slack card. The key technical decisions: (1) add request authentication (API key header), (2) add a queue for burst requests since Gemini is rate-limited, (3) expose a `/health` endpoint for their monitoring. The Slack app would use `response_url` for delayed responses since the analysis takes longer than Slack's 3-second slash command timeout.
+
+**Q: You're in a client demo and the report fails mid-presentation. What do you do?**
+
+A: Three options in priority order. First, check if the failure is a frontend timeout — reload the page and re-run; if the backend finished processing, the new request starts fresh. Second, if the backend is the issue, show the client the fallback state — the system returns an honest JSON with `_failed: true` markers, which still shows partial sections. Point out that "partial data > no data > crash" is a design principle. Third, if both fail, switch to a pre-cached demo report (I always have 3-4 saved reports in localStorage for exactly this scenario). The goal is to never let a single API failure kill a demo. That's why the error handling architecture exists.
+
+**Q: How do you onboard a new engineer onto this codebase in their first week?**
+
+A: Day 1: architecture tour — two servers (`main.py` + `llm_engine.py`) mounted together, three DS modules (classifier, Monte Carlo, VADER) in `/ds/`, 20+ extensions in `/run`. Day 2: run the eval suite — `golden.test.py` tells you if anything is broken in 5 minutes. Day 3: trace one full request end-to-end — `POST /analyze` → market search → LLM synthesis → DS pipeline → response. Day 4: change one post-processing rule (e.g. the burn floor from $50K to $40K) and verify the eval still passes. By end of week 1 they should be able to add a new extension without breaking existing ones. The key principle: the eval suite is the source of truth. If the golden test passes, the change is safe.
+
+**Q: A client is asking "why does the survival probability show 67%? Can I trust that number?" How do you respond?**
+
+A: I tell them exactly how it was calculated — and I'm transparent about its limitations. "This is an XGBoost classifier trained on 2,000 synthetic startup records. It learned that B2B AI ideas in LegalTech historically survive more often than consumer apps — that directional signal is real. But 67% doesn't mean exactly 67 out of 100 similar startups survive — the training data is synthetic, not empirical Crunchbase data. Think of it as a signal, not a precise actuarial probability. The confidence band (54%–80%) shows you the uncertainty. The value is comparison — use it to rank 3 ideas, not to bet on one." The output already discloses this in the `data_note` field: "XGBoost trained on 2,000 synthetic startups. Outputs are directional signals, not actuarial probabilities."
+
+**Q: The Serper API bill spiked 10x this month. How do you investigate?**
+
+A: Check three things. First, are multiple searches running per request when they should run once — check if the search key rotation uses `random.choice()` (which could cause duplicate calls) vs. a controlled counter. Second, check if the retry logic has a bug that retries on success (not just failure) — a loop without a break condition could chain searches. Third, check if any extension is calling market search independently rather than reusing the result from the main `/analyze` call — extensions should receive the search results as input, not re-fetch. Long term fix: add a request-level cache keyed on the idea string so identical ideas share search results. Also add a search call counter to the logs so you can see per-endpoint usage.
+
+**Q: How do you handle a client who says "your AI said my competitor has $50M in funding but actually they raised $200M"?**
+
+A: Acknowledge it directly — the system uses Serper search results which may surface stale articles. "The search grounding is real-time Google results, which are only as good as what's indexed. For fast-moving companies, the funding data can lag by 6-12 months." Two immediate actions: (1) add the correct number to `GIANT_INTEL` — our hardcoded knowledge base for major companies — so future reports use the correct value; (2) add the company name to the manual override list so Serper results for that company are supplemented with the KB data. Long-term: add a Crunchbase API integration for funding data specifically. The lesson: market facts need a verifiable source, not just search results. This is why the evidence model has source tiers and confidence scores — tier-1 sources (Statista, Crunchbase) are trusted, tier-3 (random articles) are flagged as lower confidence.
+
+**Q: A large enterprise client wants to run this for 500 ideas per day. What breaks first?**
+
+A: Gemini free tier breaks first — 1,500 RPD across 6 keys, each `/analyze` call makes 2-3 Gemini calls, so ~500 ideas = 1,000-1,500 Gemini calls, right at the ceiling. Fix: upgrade to Gemini paid API ($0.075/1K tokens Flash), which removes the RPD cap and lifts the limit to 2,000 RPM. Second constraint: Serper — 2,500 searches/day across 6 keys = 15,000/day, so Serper holds. Third: the backend itself — a single FastAPI instance can handle ~100 concurrent requests but the async design means 500 ideas/day (if spread over 8 hours = ~1/min) is fine. If they want 500 in an hour, add a task queue (Celery + Redis) in front of the LLM calls. Fourth: cost — at paid Gemini rates, 500 reports/day ≈ $15-25/day. That's the business conversation.
+
+**Q: How do you monitor whether the DS pipeline is performing well in production?**
+
+A: Three observability layers. First, log every DS module call with: idea hash, sector_encoded, survival_probability, and time_ms. This gives you a dashboard of "are survival probabilities reasonably distributed" — if everything clusters at 0.28 or 0.57, a post-processing rule is dominating. Second, track the `provenance_level` field in responses — if `inferred` is rising relative to `verified`, search quality is degrading. Third, add a canary: run the 50-idea golden test dataset on a cron every 24 hours and alert if pass rate drops below 48/50. This catches model drift from API updates or prompt changes immediately. The specific metric that matters most for the DS pipeline is the survival probability distribution — it should be roughly bell-shaped, not bimodal.
+
+**Q: A client wants you to customize the risk tolerance in the scoring — they only invest in healthcare ideas and want higher survival chances for HealthTech. How do you implement it?**
+
+A: Two approaches with different trade-offs. Quick approach (1 day): add a `sector_boost` parameter to the `/analyze` API request, and in the post-processing `_classify_sector()` function, add a `sector_override_floor` — if sector is HealthTech, floor the survival probability at 0.55 instead of the default 0.57 AI+B2B floor. This is a parameter tweak, not a model change. Robust approach (1 week): add sector-specific P1/P2 override rules to the classifier, and create a client config object: `{"sector_focus": "healthcare", "risk_multiplier": 1.2}` that adjusts thresholds throughout the pipeline. The clean way is a configuration layer that sits above the model — clients configure it, the model runs unchanged underneath.
+
+---
+
+## 11. PRODUCTION SCENARIOS & DEBUGGING PLAYBOOK
+
+### Scenario A: "All reports show the same survival probability"
+
+**Symptoms:** Every idea returns exactly 0.28 or 0.57 regardless of input.
+
+**Root cause:** One of the post-processing override rules (P1 or P2) is firing for every idea.
+- P1 fires when `sector == 9 and has_ai_keyword == 0 and is_b2b == 0` → caps at 0.28
+- P2 fires when `has_ai_keyword == 1 and is_b2b == 1` → floors at 0.57
+
+**Debug steps:**
+1. Add logging to classifier.py: `logger.info(f"P1_fire={p1_fired}, P2_fire={p2_fired}, sector={sector}")`
+2. If P1 is always firing: the `_has_word()` matching is failing on common B2B keywords — check for case-sensitivity issues
+3. If P2 is always firing: the `has_ai_keyword` check is matching too broadly
+4. Run golden test: `python golden.test.py` — it checks distribution, not just pass rate
+
+---
+
+### Scenario B: "Extensions load one by one instead of all at once"
+
+**Symptoms:** Report loads the main section, then extensions appear one at a time with 8-second gaps.
+
+**Root cause:** `Promise.all()` was used instead of `Promise.allSettled()`, OR the extension calls were accidentally serialized with `await` inside a loop.
+
+**Debug steps:**
+1. Open browser DevTools → Network tab → filter by `/run`
+2. All extension requests should fire within milliseconds of each other (parallel)
+3. If they're sequential (each starts after the previous finishes), find the `await` in the extension fetch loop and replace with `Promise.allSettled()`
+4. If NIM is degraded and the 15-second timeout is firing: check `_nim_degraded` flag — if false when NIM is down, the health check isn't running on startup
+
+---
+
+### Scenario C: "Market data shows '—' for TAM and Growth"
+
+**Symptoms:** The market section shows dashes for TAM, forecast TAM, and CAGR. Competitor section is also thin.
+
+**Root cause chain:** Serper/Exa search returned empty results → `extract_market_claims()` found no regex matches → `format_fact_table_for_prompt()` sent empty context → LLM had no grounding → output empty strings → frontend shows '—'
+
+**Debug steps:**
+1. Check Serper quota: `curl https://google.serper.dev/search -H "X-API-KEY: {key}" -d '{"q": "test"}' | jq '.organic | length'` — if 0 results, quota hit
+2. Check DuckDuckGo fallback: is the try/except for DDGS catching too broadly?
+3. Check freshness guard: is `is_outdated_source()` filtering out valid 2024 articles because they also mention 2023?
+4. Add debug log: `logger.debug(f"search_results_count={len(results)}, claims_extracted={len(claims)}")`
+
+---
+
+### Scenario D: "Burn rate shows $12,000/month for a funded startup"
+
+**Symptoms:** Financial projection section shows monthly burn of $10K-$15K. The `_enforce_burn_floor()` guardrail should prevent this.
+
+**Root cause:** The post-processing regex is failing to match the LLM's output format. If the LLM writes `"$12K/month"` instead of `"$12,000/month"`, the regex `r'\$[\d,]+'` won't match.
+
+**Fix:** Update regex to handle K/M suffixes:
+```python
+def _enforce_burn_floor(data):
+    burn_str = data.get("monthly_burn", "")
+    # Handle "$12K" format
+    m = re.search(r'\$(\d+(?:\.\d+)?)(K|M)?', burn_str)
+    if m:
+        val = float(m.group(1))
+        if m.group(2) == 'K': val *= 1000
+        if val < 25000:
+            data["monthly_burn"] = "$35,000/month"
+```
+
+---
+
+## 12. STAKEHOLDER COMMUNICATION SCRIPTS
+
+### Explaining to a Non-Technical Founder
+
+> "The survival probability isn't a magic number — it's what a model trained on thousands of startup patterns says about ideas like yours. Think of it like a weather forecast: '67% chance of rain' doesn't mean it will or won't rain, it means most days that look like today end up with rain. Your idea has structural similarities to startups that succeeded — B2B, AI-powered, in a regulated industry — so it scores higher than a consumer app. Use it to compare two ideas, not to bet on one."
+
+### Explaining the Monte Carlo to a VC
+
+> "We run 10,000 financial simulations, each with slightly different assumptions about your customer acquisition cost, churn rate, and growth. The Bear case is the worst 10% of those outcomes — the Bull case is the best 10%. The median is what you should actually plan for. This gives you a range, not a number. A single runway estimate is false precision — a distribution is honest."
+
+### Explaining the System to a Technical CTO
+
+> "It's a FastAPI backend with two mounted servers — one for the core analysis pipeline, one for the 20+ parallel extension modules. The LLM calls use a six-key rotation pool with NIM as an independent safety net. The DS layer runs three local models — XGBoost, Monte Carlo numpy simulation, and VADER — none of which make network calls, so they're always available. The key design decision: every piece of data has a provenance label — verified, estimated, inferred, or unsupported. The system never presents hallucinated data as fact."
+
+### Explaining to a Hiring Manager (DS Position)
+
+> "The project demonstrates applied ML in a production context — not a Jupyter notebook, but a live API with real users. The XGBoost model has a specific design decision I'm proud of: the sector priority order. Without it, 'AI-powered contract software' gets the wrong sector, wrong competitors, wrong financial benchmarks. The fix was understanding the feature engineering pipeline deeply enough to know that keyword order matters. That's the kind of system-level thinking I bring to ML work."
+
+### Explaining to a Hiring Manager (FDE Position)
+
+> "The project demonstrates the pattern I care most about: reliability without complexity. The system has a four-tier fallback chain — NIM, Gemini Flash, Gemini Lite, honest fallback. Every fallback was added because a real failure mode was observed. The NIM health check exists because a degraded NIM was silently adding 5 minutes to every report. Post-processing guardrails exist because the LLM was generating $10K burn rates for funded startups. Every engineering decision was driven by a real production failure, not theoretical risk."
+
+---
+
+*Document updated: 2026-05-19 — covers Applied Data Scientist + Forward Deployed Engineer interview preparation*
 *System: LaunchMintAI v1 — Applied DS Portfolio Project*
