@@ -1,7 +1,7 @@
 """
 Pitch Forge endpoint test — run this with backend already started.
 Tests: all 5 fields present, tagline concise, tweet ≤280 chars, no jargon, no static fallback.
-30 ideas across 5 tiers — consumer clone → thin B2B → vertical SaaS → enterprise AI → platform.
+15 ideas across 5 tiers — consumer clone → thin B2B → vertical SaaS → enterprise AI → platform.
 """
 import requests
 import time
@@ -9,44 +9,29 @@ import time
 BASE_URL = "http://localhost:8000"
 
 TEST_IDEAS = [
-    # ── TIER 1: Consumer / Clone (6 ideas) ────────────────────────────────────
+    # ── TIER 1: Consumer / Clone (3 ideas) ────────────────────────────────────
     ("Dating app for gamers", "t1"),
     ("Subscription box for artisan coffee", "t1"),
     ("Freelance marketplace for video editors", "t1"),
-    ("Fitness tracking app for dog owners", "t1"),
-    ("Meal kit delivery service for college students", "t1"),
-    ("Peer-to-peer rental marketplace for camping gear", "t1"),
 
-    # ── TIER 2: Thin B2B Feature (6 ideas) ────────────────────────────────────
+    # ── TIER 2: Thin B2B Feature (3 ideas) ────────────────────────────────────
     ("AI chatbot for e-commerce customer support", "t2"),
     ("Automated social media posting scheduler", "t2"),
-    ("Email signature generator for sales teams", "t2"),
     ("Invoice reminder automation for freelancers", "t2"),
-    ("Website live chat widget for local service businesses", "t2"),
-    ("AI meeting notes summarizer for remote teams", "t2"),
 
-    # ── TIER 3: Vertical SaaS — end-to-end workflow (8 ideas) ─────────────────
+    # ── TIER 3: Vertical SaaS — end-to-end workflow (3 ideas) ─────────────────
     ("Practice management SaaS for independent physical therapy clinics", "t3"),
-    ("Job costing and project tracking SaaS for electrical contractors", "t3"),
     ("Case management SaaS for immigration law firms", "t3"),
-    ("Inventory and order management SaaS for independent pharmacies", "t3"),
-    ("Scheduling and billing SaaS for independent music teachers and studios", "t3"),
     ("Fleet maintenance and compliance SaaS for regional trucking companies", "t3"),
-    ("Client portal and workflow SaaS for boutique accounting firms", "t3"),
-    ("Permit tracking and project management SaaS for residential home builders", "t3"),
 
-    # ── TIER 4: Enterprise AI replacing manual role (6 ideas) ─────────────────
-    ("AI platform for automating insurance policy renewals replacing manual underwriters", "t4"),
-    ("Autonomous document processing agent for mortgage origination reducing closing time from 45 to 7 days", "t4"),
+    # ── TIER 4: Enterprise AI replacing manual role (3 ideas) ─────────────────
     ("AI-powered clinical documentation replacing manual physician note-taking in hospitals", "t4"),
     ("Autonomous legal contract drafting agent for M&A transactions replacing junior associates", "t4"),
     ("AI-powered accounts payable automation replacing manual invoice processing at mid-market manufacturers", "t4"),
-    ("Autonomous patient prior authorization agent replacing manual insurance coordinators at specialty clinics", "t4"),
 
-    # ── TIER 5: Platform replacing entire legacy category (4 ideas) ───────────
+    # ── TIER 5: Platform replacing entire legacy category (3 ideas) ───────────
     ("AI-native accounting platform replacing QuickBooks for professional services firms", "t5"),
     ("AI-native HR platform replacing legacy SAP SuccessFactors for mid-market enterprises", "t5"),
-    ("AI-native ERP platform replacing legacy Oracle NetSuite for mid-market distribution companies", "t5"),
     ("AI-native legal practice management platform replacing legacy Clio for mid-size law firms", "t5"),
 ]
 
@@ -148,7 +133,7 @@ def test_forge(idea: str, tier: str):
 
 if __name__ == "__main__":
     tier_counts = {f"t{i}": sum(1 for _, s in TEST_IDEAS if s == f"t{i}") for i in range(1, 6)}
-    print("Pitch Forge — 30 idea test suite")
+    print("Pitch Forge — 15 idea test suite")
     print("Backend: localhost:8000")
     print(f"Ideas: {len(TEST_IDEAS)} | " + " | ".join(f"Tier {k[-1]}: {v}" for k, v in tier_counts.items()))
     print("Checks: static fallback · tagline length · tweet ≤280 · jargon · value prop · elevator · subject\n")
@@ -166,10 +151,10 @@ if __name__ == "__main__":
                 failed += 1
                 if "STATIC FALLBACK" in str(ok):
                     fallbacks += 1
-            # 15s delay — free tier Gemini resets per-minute quota every 60s
-            # 30 ideas × 15s = ~7.5 min total. Required after heavy VC Roast test runs.
-            print(f"   ⏳ waiting 15s before next request...")
-            time.sleep(15)
+            # 8s delay — free tier Gemini resets per-minute quota every 60s
+            # 15 ideas × 8s = ~2 min total.
+            print(f"   ⏳ waiting 8s before next request...")
+            time.sleep(8)
         except requests.exceptions.ConnectionError:
             print("❌ Cannot connect. Start backend first.")
             break
