@@ -158,7 +158,7 @@ function DeltaAnalysisApp({ archive, setArchive }: { archive: RealData[], setArc
 
                     {/* Skeleton — mirrors exact result layout */}
                     {loading && (
-                        <div className="animate-pulse space-y-6 mt-4">
+                        <div className="animate-pulse space-y-6">
                             {/* Winner banner skeleton */}
                             <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 flex flex-col items-center gap-4">
                                 <div className="w-10 h-10 bg-slate-800 rounded-full" />
@@ -169,9 +169,9 @@ function DeltaAnalysisApp({ archive, setArchive }: { archive: RealData[], setArc
                             </div>
                             {/* Scorecard skeleton */}
                             <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 space-y-4">
-                                <div className="h-3 bg-slate-800 rounded-full w-40 mb-2" />
+                                <div className="h-3 bg-slate-800 rounded-full w-48 mb-2" />
                                 {/* Column headers */}
-                                <div className="grid grid-cols-3 gap-4 mb-2">
+                                <div className="grid grid-cols-3 gap-4 mb-1">
                                     <div className="h-2 bg-slate-800 rounded-full" />
                                     <div className="h-2 bg-slate-800 rounded-full" />
                                     <div className="h-2 bg-slate-800 rounded-full" />
