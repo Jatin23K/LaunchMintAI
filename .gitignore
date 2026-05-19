@@ -48,3 +48,9 @@ AGENTS.md
 # backend/app/ds/eval/results/ → committed
 # backend/app/ds/eval/charts/  → committed
 INTERVIEW.md
+other projects/
+
+# ── Interview Prep Docs (local only, not for repo) ───────────────────────────
+*_EXPLAINER.md
+DEPLOYMENT.md
+NEXT_STEPS.md
