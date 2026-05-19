@@ -245,6 +245,11 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
     const [extIntelOpen, setExtIntelOpen] = useState<string | null>(null);
     const [warData, setWarData] = useState<any | null>(null);
     const [warRoomOpen, setWarRoomOpen] = useState<number | null>(null);
+    // OPT 8: SSE stage progress state
+    const [stage, setStage] = useState<string>('');
+    // OPT 5: In-flight request deduplication refs
+    const inFlightRef = useRef<string | null>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         console.log("📊 [TRACKING] SCREEN_VIEW: Validator");
@@ -762,6 +767,11 @@ ${html}
         const textToAnalyze = text || input;
         const cleanedText = textToAnalyze.trim();
 
+        // OPT 5: Deduplicate in-flight requests
+        const dedupeKey = cleanedText.toLowerCase();
+        if (inFlightRef.current === dedupeKey) return; // Already processing this idea
+        if (loading) return;
+
         if (cleanedText.length < 5) { // Relaxed to 5 chars
             setError("Analysis requires a slightly longer description for meaningful grounding.");
             setInput('');
@@ -791,10 +801,28 @@ ${html}
             return;
         }
 
+        // OPT 5: Mark this idea as in-flight
+        inFlightRef.current = dedupeKey;
+
         setLoading(true); setDsLoading(true); setData(null); setWarData(null); setDeepIntel(null); setExtIntel(null); setDsData(null); setError(null); setIsSaved(false); setIsFromCache(false);
         setActiveDepartment('Product'); setSelectedCompetitor(null); setInput(cleanedText);
-        setTerminalLogs([]); setLoadingMsg("🚀 Initializing AI Agents...");
+        setTerminalLogs([]); setLoadingMsg("Initializing AI Agents...");
+        setStage('');
         setStatus('processing');
+
+        // OPT 8: SSE progress stream — updates stage label in skeleton
+        const sseUrl = `${API_BASE_URL}/analyze/stream?idea=${encodeURIComponent(cleanedText)}`;
+        let sseSource: EventSource | null = null;
+        try {
+            sseSource = new EventSource(sseUrl);
+            sseSource.onmessage = (ev) => {
+                try {
+                    const payload = JSON.parse(ev.data);
+                    setStage(payload.label || '');
+                } catch { /* ignore parse errors */ }
+            };
+            sseSource.onerror = () => { sseSource?.close(); };
+        } catch { /* SSE not critical — main fetch continues regardless */ }
 
         const logs = [
             "> Deploying market intelligence agent...",
@@ -942,7 +970,20 @@ ${html}
             clearInterval(logInterval);
             setLoading(false);
             setDsLoading(false);
+            // OPT 8: Close SSE stream
+            sseSource?.close();
+            setStage('');
+            // OPT 5: Clear in-flight marker
+            inFlightRef.current = null;
         }
+    };
+
+    // OPT 5: Debounced button click handler (300ms)
+    const handleAnalyzeClick = (text?: string) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            runAnalysis(text);
+        }, 300);
     };
 
     const getDeptList = () => {
@@ -981,9 +1022,9 @@ ${html}
                                     onChange={(e) => setInput(e.target.value)}
                                     placeholder="Describe your game-changing idea..."
                                     className="flex-1 bg-transparent text-white placeholder-gray-500 text-sm md:text-base outline-none h-10"
-                                    onKeyDown={(e) => e.key === 'Enter' && runAnalysis(input)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAnalyzeClick(input)}
                                 />
-                                <button aria-label="Run startup analysis" onClick={() => runAnalysis(input)} className="bg-emerald-500 hover:bg-emerald-400 text-black px-4 md:px-6 h-10 rounded-full font-bold text-[10px] md:text-xs tracking-wide transition-transform active:scale-95 flex items-center gap-2">
+                                <button aria-label="Run startup analysis" onClick={() => handleAnalyzeClick(input)} className="bg-emerald-500 hover:bg-emerald-400 text-black px-4 md:px-6 h-10 rounded-full font-bold text-[10px] md:text-xs tracking-wide transition-transform active:scale-95 flex items-center gap-2">
                                     VALIDATE <ChevronRight className="w-3 h-3 stroke-[3px]" />
                                 </button>
                             </div>
@@ -1016,7 +1057,10 @@ ${html}
                     <div className="bg-slate-950 border border-cyan-500/30 rounded-2xl p-6 md:p-8 font-mono text-xs md:text-sm shadow-[0_0_50px_rgba(16,185,129,0.1)]">
                         <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-800">
                             <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-                            <span className="text-emerald-400 font-bold uppercase tracking-widest">{loadingMsg}</span>
+                            <span className="text-emerald-400 font-bold uppercase tracking-widest">
+                                {/* OPT 8: Show SSE stage name when available */}
+                                {stage || loadingMsg || 'Initializing AI Agents...'}
+                            </span>
                         </div>
                         <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
                             {terminalLogs.map((log, i) => (
