@@ -250,6 +250,10 @@ function ValidatorApp({ onSave, data, setData, setStatus }: { onSave: (report: R
     // OPT 5: In-flight request deduplication refs
     const inFlightRef = useRef<string | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const extPayloadRef = useRef<{ idea: string; market_size: string; growth_rate: string } | null>(null);
+    const cleanedTextRef = useRef<string>('');
+    const [retryingSection, setRetryingSection] = React.useState<string | null>(null);
+    const mkMeta = (r: any) => ({ provenance_level: r?.provenance_level, evidence_used: r?.evidence_used, error_reason: r?.error_reason });
 
     useEffect(() => {
         console.log("📊 [TRACKING] SCREEN_VIEW: Validator");
@@ -892,6 +896,8 @@ ${html}
                 const mktSize = resultData.market?.forecast_tam || 'Unknown';
                 const growth = resultData.market?.growth || 'Unknown';
                 const extPayload = { idea: cleanedText, market_size: mktSize, growth_rate: growth };
+                extPayloadRef.current = extPayload;
+                cleanedTextRef.current = cleanedText;
                 const deepTimeout = { timeout: 180000 };
                 Promise.allSettled([
                     api.post('/run', { extension_id: 'financial-projection', payload: extPayload }, deepTimeout),
@@ -912,7 +918,6 @@ ${html}
                 setExtIntelLoading(true);
                 const extTimeout = { timeout: 180000 };
                 const extTimeout2 = { timeout: 180000 };
-                const mkMeta = (r: any) => ({ provenance_level: r?.provenance_level, evidence_used: r?.evidence_used, error_reason: r?.error_reason });
                 const mkFailed = () => ({ _failed: true });
 
                 Promise.allSettled([
@@ -1133,7 +1138,7 @@ ${html}
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {isStale && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/15 border border-amber-500/30 text-amber-300">Cached report is stale</span>}
-                                    {data.credibility.stale_sources > 0 && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/15 border border-amber-500/30 text-amber-300">{data.credibility.stale_sources} stale source{data.credibility.stale_sources > 1 ? 's' : ''}</span>}
+                                    {data.credibility.stale_sources.length > 0 && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/15 border border-amber-500/30 text-amber-300">{data.credibility.stale_sources.length} stale source{data.credibility.stale_sources.length > 1 ? 's' : ''}</span>}
                                     {data.credibility.conflicts_detected?.length > 0 && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/15 border border-red-500/30 text-red-300">{data.credibility.conflicts_detected.length} source conflict{data.credibility.conflicts_detected.length > 1 ? 's' : ''}</span>}
                                 </div>
                             </div>
@@ -1447,21 +1452,36 @@ ${html}
                                                     <p className="text-slate-400 text-sm font-semibold">This section timed out — the LLM took too long to respond.</p>
                                                     <p className="text-slate-500 text-xs">Click retry to load just this section.</p>
                                                     <button
-                                                        onClick={() => {
+                                                        disabled={retryingSection === `deep-${key}`}
+                                                        onClick={async () => {
+                                                            const sectionId = `deep-${key}`;
+                                                            setRetryingSection(sectionId);
                                                             const payload = key === 'fin' || key === 'gtm' || key === 'risk'
-                                                                ? extPayload
-                                                                : { idea: cleanedText };
+                                                                ? extPayloadRef.current
+                                                                : { idea: cleanedTextRef.current };
                                                             const extId = key === 'fin' ? 'financial-projection' : key === 'gtm' ? 'gtm-strategy' : 'risk-scanner';
-                                                            api.post('/run', { extension_id: extId, payload }, { timeout: 180000 }).then((res: any) => {
+                                                            try {
+                                                                const res = await api.post('/run', { extension_id: extId, payload }, { timeout: 180000 });
                                                                 setDeepIntel((prev: any) => ({
                                                                     ...prev,
-                                                                    [key]: { ...(res.data?.data || {}), _meta: { provenance_level: res.data?.provenance_level, evidence_used: res.data?.evidence_used } }
+                                                                    [key]: { ...(res.data?.data || {}), _failed: false, _meta: { provenance_level: res.data?.provenance_level, evidence_used: res.data?.evidence_used } }
                                                                 }));
-                                                            }).catch(() => {});
+                                                            } catch (err: any) {
+                                                                console.error(`[Retry] deep-${key} failed:`, err?.response?.data?.detail || err?.message);
+                                                                // keep _failed=true so button stays visible
+                                                                setDeepIntel((prev: any) => ({
+                                                                    ...prev,
+                                                                    [key]: { ...(prev?.[key] || {}), _failed: true }
+                                                                }));
+                                                            } finally {
+                                                                setRetryingSection(null);
+                                                            }
                                                         }}
-                                                        className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors"
+                                                        className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors flex items-center gap-2 mx-auto"
                                                     >
-                                                        ↻ Retry {label}
+                                                        {retryingSection === `deep-${key}` ? (
+                                                            <><svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Retrying...</>
+                                                        ) : <>↻ Retry {label}</>}
                                                     </button>
                                                 </div>
                                             )}
@@ -1664,7 +1684,10 @@ ${html}
                                                     <p className="text-slate-400 text-sm font-semibold">This section timed out — the LLM took too long to respond.</p>
                                                     <p className="text-slate-500 text-xs">Click retry to load just this section.</p>
                                                     <button
-                                                        onClick={() => {
+                                                        disabled={retryingSection === `ext-${key}`}
+                                                        onClick={async () => {
+                                                            const sectionId = `ext-${key}`;
+                                                            setRetryingSection(sectionId);
                                                             const extIdMap: Record<string, string> = {
                                                                 personas: 'user-persona', redFlags: 'people-analysis',
                                                                 pricing: 'pricing-strategy', funding: 'funding-readiness',
@@ -1672,17 +1695,29 @@ ${html}
                                                                 moat: 'moat-analysis', exit: 'exit-scenarios',
                                                             };
                                                             const needsMarket = ['pricing', 'funding', 'exit'];
-                                                            const payload = needsMarket.includes(key) ? extPayload : { idea: cleanedText };
-                                                            api.post('/run', { extension_id: extIdMap[key], payload }, { timeout: 180000 }).then((res: any) => {
+                                                            const payload = needsMarket.includes(key) ? extPayloadRef.current : { idea: cleanedTextRef.current };
+                                                            try {
+                                                                const res = await api.post('/run', { extension_id: extIdMap[key], payload }, { timeout: 180000 });
                                                                 setExtIntel((prev: any) => ({
                                                                     ...prev,
-                                                                    [key]: { ...(res.data?.data || {}), _meta: mkMeta(res.data) }
+                                                                    [key]: { ...(res.data?.data || {}), _failed: false, _meta: mkMeta(res.data) }
                                                                 }));
-                                                            }).catch(() => {});
+                                                            } catch (err: any) {
+                                                                console.error(`[Retry] ext-${key} failed:`, err?.response?.data?.detail || err?.message);
+                                                                // keep _failed=true so button stays visible for another attempt
+                                                                setExtIntel((prev: any) => ({
+                                                                    ...prev,
+                                                                    [key]: { ...(prev?.[key] || {}), _failed: true }
+                                                                }));
+                                                            } finally {
+                                                                setRetryingSection(null);
+                                                            }
                                                         }}
-                                                        className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors"
+                                                        className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors flex items-center gap-2 mx-auto"
                                                     >
-                                                        ↻ Retry {label}
+                                                        {retryingSection === `ext-${key}` ? (
+                                                            <><svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Retrying...</>
+                                                        ) : <>↻ Retry {label}</>}
                                                     </button>
                                                 </div>
                                             )}
