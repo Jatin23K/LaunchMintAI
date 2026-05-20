@@ -37,12 +37,12 @@ export const CompetitorDeepDive: React.FC = () => {
     setResult(null); 
     
     try {
-        const res = await runStandaloneTool<CompetitorDeepDiveInput, CompetitorDeepDiveResult>(
+        const res = await runStandaloneTool(
             'CompetitorDeepDive',
             formData,
             CompetitorDeepDiveSchema,
             COMPETITOR_DEEPDIVE_FALLBACK
-        );
+        ) as CompetitorDeepDiveResult;
         setResult(res);
     } catch (e) {
         console.error(e);

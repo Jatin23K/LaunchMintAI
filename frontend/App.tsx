@@ -62,9 +62,14 @@ export default function App() {
         }
     });
 
-    // Fire-and-forget warmup ping on app load so Render backend wakes before first real request
+    // Keep-alive: ping backend every 10 minutes while tab is open.
+    // Render free tier sleeps after 15 minutes of inactivity — this prevents that.
     useEffect(() => {
-        warmupBackend();
+        warmupBackend(); // immediate ping on load
+        const keepAlive = setInterval(() => {
+            warmupBackend();
+        }, 10 * 60 * 1000); // every 10 minutes
+        return () => clearInterval(keepAlive); // cleanup on unmount
     }, []);
 
     useEffect(() => {

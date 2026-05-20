@@ -158,12 +158,12 @@ export const TestSuiteCompetitor: React.FC = () => {
   const runTestLogic = async (t: TestDefinition) => {
     const startTime = Date.now();
     try {
-        const result = await runStandaloneTool<CompetitorDeepDiveInput, CompetitorDeepDiveResult>(
+        const result = (await runStandaloneTool(
             "CompetitorDeepDive",
             t.input,
             CompetitorDeepDiveSchema,
             COMPETITOR_DEEPDIVE_FALLBACK
-        );
+        )) as CompetitorDeepDiveResult;
         const ok = t.check(result);
         const duration = Date.now() - startTime;
 
