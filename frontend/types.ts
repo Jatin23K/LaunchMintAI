@@ -618,6 +618,7 @@ export interface FinancialsData {
   breakeven_probability: number;
   ltv_cac_ratio: number;
   simulations_run: number;
+  assumption_source?: string;
 }
 
 interface SentimentCompetitor {
@@ -630,8 +631,8 @@ interface SentimentCompetitor {
 export interface DSInsightsData {
   survival: SurvivalData;
   financials: FinancialsData;
-  sentiment: { competitors: SentimentCompetitor[] };
-  meta: { pipeline_latency_ms: number; };
+  sentiment: { competitors: SentimentCompetitor[], signal_source?: string };
+  meta: { pipeline_latency_ms: number, evidence_policy?: string };
 }
 
 export interface VCRoastData {
@@ -673,6 +674,7 @@ export interface EvidenceClaim {
 export interface FieldProvenance {
   status: ClaimStatus;
   source_url: string;
+  source_title?: string;
   source_quote: string;
   source_year: number | null;
   notes: string;
