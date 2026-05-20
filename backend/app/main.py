@@ -448,8 +448,12 @@ def sort_feed(f: FeedInput):
     return {"sorted": sorted_items}
 
 @app.get("/")
-def health():
+def root():
     return {"status": "Online"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
