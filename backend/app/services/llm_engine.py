@@ -202,7 +202,7 @@ class DSInsightsRequest(BaseModel):
 class VCRoastRequest(BaseModel):
     user_idea: str
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health_check():
     """Lightweight warmup endpoint — called on frontend load to pre-wake Render free tier."""
     return {"status": "ok", "service": "LaunchMintAI Backend"}
