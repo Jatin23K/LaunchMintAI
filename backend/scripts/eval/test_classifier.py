@@ -2,8 +2,6 @@ import sys
 import os
 
 # Add the backend directory to sys.path so we can import app modules
-import sys
-import os
 sys.path.append(os.path.join(os.getcwd(), 'backend'))
 
 from app.services.llm_engine import classify_industry, API_KEY
