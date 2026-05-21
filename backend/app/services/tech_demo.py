@@ -19,7 +19,7 @@ class TaskManager:
     def __init__(self):
         # Python's heap is a Min-Heap. 
         # To make it a Max-Heap (Highest Priority first), we store priority as NEGATIVE.
-        self.task_heap: List[Tuple[int, string]] = []
+        self.task_heap: List[Tuple[int, str]] = []
 
     def add_task(self, priority: int, task_name: str):
         """

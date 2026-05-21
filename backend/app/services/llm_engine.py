@@ -1213,23 +1213,6 @@ def _tam_sanity_check(market: dict, source_objects: list):
             pass
 
 
-@app.get("/analyze/stream")
-async def analyze_stream(idea: str):
-    """OPT 8: SSE progress streaming — yields stage events while main analysis runs."""
-    async def event_generator():
-        stages = [
-            ("market_search", 15, "Searching markets..."),
-            ("competitor_analysis", 35, "Analyzing competitors..."),
-            ("ds_pipeline", 55, "Running DS pipeline..."),
-            ("god_mode", 75, "Computing risk scores..."),
-            ("complete", 100, "Analysis complete"),
-        ]
-        for stage, pct, label in stages:
-            yield f"data: {json.dumps({'stage': stage, 'pct': pct, 'label': label})}\n\n"
-            if stage != "complete":
-                await asyncio.sleep(12)  # ~60s total across 4 intervals
-    return StreamingResponse(event_generator(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # OPT 9: SSE progress stream — frontend subscribes to this for real-time stage updates
