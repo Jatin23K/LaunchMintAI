@@ -451,7 +451,7 @@ def sort_feed(f: FeedInput):
 def root():
     return {"status": "Online"}
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok"}
 
