@@ -47,7 +47,13 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Run Python Spell-Checker (Ruff)
+        working-directory: backend
+        run: ruff check .
 
       - name: Import check
         working-directory: backend
