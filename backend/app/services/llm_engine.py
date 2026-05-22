@@ -20,11 +20,39 @@ from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 import concurrent.futures
 
-# ── OPT 1: Server-Side In-Memory Response Cache ────────────────────────────
-_RESPONSE_CACHE: dict[str, tuple[dict, float]] = {}  # key -> (result, timestamp)
+import redis
+
+# ── OPT 1: Redis or In-Memory Response Cache ────────────────────────────
 _CACHE_TTL = 86400  # 24 hours
 
+# Try to initialize Upstash Redis
+redis_url = os.environ.get("REDIS_URL")
+redis_client = None
+if redis_url:
+    try:
+        redis_client = redis.from_url(redis_url)
+        # Ping to verify connection
+        redis_client.ping()
+        print("[CACHE] Upstash Redis connected.")
+    except Exception as e:
+        print(f"[CACHE] Failed to connect to Redis: {e}. Falling back to in-memory.")
+        redis_client = None
+
+# Fallback in-memory cache
+_RESPONSE_CACHE: dict[str, tuple[dict, float]] = {}
+
 def _cache_get(key: str) -> dict | None:
+    if redis_client:
+        try:
+            cached = redis_client.get(key)
+            if cached:
+                return json.loads(cached)
+            return None
+        except Exception as e:
+            print(f"[CACHE] Redis get error: {e}")
+            return None
+    
+    # Fallback logic
     if key in _RESPONSE_CACHE:
         result, ts = _RESPONSE_CACHE[key]
         if time.time() - ts < _CACHE_TTL:
@@ -33,7 +61,14 @@ def _cache_get(key: str) -> dict | None:
     return None
 
 def _cache_set(key: str, value: dict):
-    # Evict oldest if over 500 entries
+    if redis_client:
+        try:
+            redis_client.setex(key, _CACHE_TTL, json.dumps(value))
+            return
+        except Exception as e:
+            print(f"[CACHE] Redis set error: {e}")
+    
+    # Fallback logic
     if len(_RESPONSE_CACHE) >= 500:
         oldest = min(_RESPONSE_CACHE, key=lambda k: _RESPONSE_CACHE[k][1])
         del _RESPONSE_CACHE[oldest]
