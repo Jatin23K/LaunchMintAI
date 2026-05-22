@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
     Rocket, Sparkles, Flame, Presentation, Activity, CheckCircle2
 } from 'lucide-react';
@@ -9,11 +9,11 @@ import NeuralBackground from './components/NeuralBackground';
 import { RecentIntel } from './components/HUD';
 import HistoryDrawer from './components/HistoryDrawer';
 
-// Features
-import ValidatorApp from './features/validator/Validator';
-import VCRoastApp from './features/vc-roast/VCRoast';
-import PitchForgeApp from './features/pitch-forge/PitchForge';
-import DeltaAnalysisApp from './features/delta-analysis/DeltaAnalysis';
+// Features (Lazy Loaded)
+const ValidatorApp = lazy(() => import('./features/validator/Validator'));
+const VCRoastApp = lazy(() => import('./features/vc-roast/VCRoast'));
+const PitchForgeApp = lazy(() => import('./features/pitch-forge/PitchForge'));
+const DeltaAnalysisApp = lazy(() => import('./features/delta-analysis/DeltaAnalysis'));
 
 // Types
 import { RealData } from './types';
@@ -43,6 +43,9 @@ const globalStyles = `
     .no-print { display: none !important; }
   }
   .print-only { display: none; }
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
 `;
 
 export default function App() {
@@ -191,17 +194,42 @@ export default function App() {
                             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                             className="w-full h-full flex flex-col items-center"
                         >
-                            {screen === 'VALIDATOR' && (
-                                <ValidatorApp
-                                    onSave={saveToArchive}
-                                    data={activeReport}
-                                    setData={setActiveReport}
-                                    setStatus={setSystemStatus}
-                                />
-                            )}
-                            {screen === 'VC_ROAST' && <VCRoastApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
-                            {screen === 'PITCH_FORGE' && <PitchForgeApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
-                            {screen === 'BATTLE_ROOM' && <DeltaAnalysisApp archive={archive} setArchive={setArchive} />}
+                            <Suspense fallback={
+                                <div className="w-full h-full flex flex-col items-center justify-center min-h-[60vh] p-4 md:p-8">
+                                    <div className="w-full max-w-4xl bg-slate-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
+                                        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_1.5s_infinite]"></div>
+                                        <div className="flex items-center gap-4 mb-8">
+                                            <div className="w-12 h-12 bg-slate-800/50 rounded-2xl animate-pulse"></div>
+                                            <div className="space-y-2">
+                                                <div className="h-5 w-48 bg-slate-800/50 rounded animate-pulse"></div>
+                                                <div className="h-3 w-24 bg-slate-800/30 rounded animate-pulse"></div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                            {[...Array(3)].map((_, i) => (
+                                                <div key={i} className="h-32 bg-slate-800/30 rounded-2xl animate-pulse"></div>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="h-4 w-full bg-slate-800/30 rounded animate-pulse"></div>
+                                            <div className="h-4 w-5/6 bg-slate-800/30 rounded animate-pulse"></div>
+                                            <div className="h-4 w-4/6 bg-slate-800/30 rounded animate-pulse"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }>
+                                {screen === 'VALIDATOR' && (
+                                    <ValidatorApp
+                                        onSave={saveToArchive}
+                                        data={activeReport}
+                                        setData={setActiveReport}
+                                        setStatus={setSystemStatus}
+                                    />
+                                )}
+                                {screen === 'VC_ROAST' && <VCRoastApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
+                                {screen === 'PITCH_FORGE' && <PitchForgeApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
+                                {screen === 'BATTLE_ROOM' && <DeltaAnalysisApp archive={archive} setArchive={setArchive} />}
+                            </Suspense>
                         </motion.div>
                     </AnimatePresence>
                 </div>
