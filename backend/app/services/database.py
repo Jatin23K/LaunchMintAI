@@ -17,11 +17,17 @@ class IdeaAnalysis(SQLModel, table=True):
     risk_score: str
     raw_data: str # Store the complete JSON as a string for safety
 
-# SQLite DB file
-sqlite_file_name = "launchmint.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-
-engine = create_engine(sqlite_url, echo=False)
+# Database Connection Logic
+database_url = os.environ.get("DATABASE_URL")
+if database_url:
+    # Supabase connection
+    # Note: Using SQLAlchemy 2.0+ with Postgres
+    engine = create_engine(database_url, echo=False, pool_size=20, max_overflow=0)
+else:
+    # Fallback to local SQLite if URL is missing
+    sqlite_file_name = "launchmint.db"
+    sqlite_url = f"sqlite:///{sqlite_file_name}"
+    engine = create_engine(sqlite_url, echo=False)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

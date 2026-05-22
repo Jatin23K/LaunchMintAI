@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, startTransition } from 'react';
 import api from '../../services/api';
 import {
     ChevronRight, TrendingUp, Users, Scale, Hammer,
@@ -893,12 +893,17 @@ ${html}
 
                 // Fire deep intel in background — non-blocking
                 setDeepIntelLoading(true);
+                setExtIntelLoading(true);
                 const mktSize = resultData.market?.forecast_tam || 'Unknown';
                 const growth = resultData.market?.growth || 'Unknown';
                 const extPayload = { idea: cleanedText, market_size: mktSize, growth_rate: growth };
                 extPayloadRef.current = extPayload;
                 cleanedTextRef.current = cleanedText;
                 const deepTimeout = { timeout: 180000 };
+                const extTimeout = { timeout: 180000 };
+                const extTimeout2 = { timeout: 180000 };
+                const mkFailed = () => ({ _failed: true });
+
                 Promise.allSettled([
                     api.post('/run', { extension_id: 'financial-projection', payload: extPayload }, deepTimeout),
                     api.post('/run', { extension_id: 'gtm-strategy', payload: extPayload }, deepTimeout),
@@ -911,40 +916,37 @@ ${html}
                     };
                     setDeepIntel(deepIntelResult);
                     setCachedResult(cleanedText, resultData, resultDsData, resultWarData, deepIntelResult, null);
-                }).finally(() => setDeepIntelLoading(false));
+                    setDeepIntelLoading(false);
 
-                // Fire extended intel in two sequential batches to prevent Gemini queue saturation.
-                // Batch 1 (5 sections) fires immediately; Batch 2 (3 sections) fires after Batch 1 completes.
-                setExtIntelLoading(true);
-                const extTimeout = { timeout: 180000 };
-                const extTimeout2 = { timeout: 180000 };
-                const mkFailed = () => ({ _failed: true });
-
-                Promise.allSettled([
-                    api.post('/run', { extension_id: 'user-persona', payload: { idea: cleanedText } }, extTimeout),
-                    api.post('/run', { extension_id: 'people-analysis', payload: { idea: cleanedText } }, extTimeout),
-                    api.post('/run', { extension_id: 'pricing-strategy', payload: extPayload }, extTimeout),
-                    api.post('/run', { extension_id: 'funding-readiness', payload: extPayload }, extTimeout),
-                    api.post('/run', { extension_id: 'legal-risks', payload: { idea: cleanedText } }, extTimeout),
-                ]).then(([personaRes, redFlagRes, pricingRes, fundingRes, legalRes]) => {
+                    // Batch 1 (4 sections) fires after Deep Intel to prevent Gemini queue saturation
+                    return Promise.allSettled([
+                        api.post('/run', { extension_id: 'user-persona', payload: { idea: cleanedText } }, extTimeout),
+                        api.post('/run', { extension_id: 'people-analysis', payload: { idea: cleanedText } }, extTimeout),
+                        api.post('/run', { extension_id: 'pricing-strategy', payload: extPayload }, extTimeout),
+                        api.post('/run', { extension_id: 'funding-readiness', payload: extPayload }, extTimeout),
+                    ]);
+                }).then((batch1Res) => {
+                    if (!batch1Res) return;
+                    const [personaRes, redFlagRes, pricingRes, fundingRes] = batch1Res;
                     const batch1 = {
                         personas: personaRes.status === 'fulfilled' ? { ...(personaRes.value.data?.data || {}), _meta: mkMeta(personaRes.value.data) } : mkFailed(),
                         redFlags: redFlagRes.status === 'fulfilled' ? { ...(redFlagRes.value.data?.data || {}), _meta: mkMeta(redFlagRes.value.data) } : mkFailed(),
                         pricing: pricingRes.status === 'fulfilled' ? { ...(pricingRes.value.data?.data || {}), _meta: mkMeta(pricingRes.value.data) } : mkFailed(),
                         funding: fundingRes.status === 'fulfilled' ? { ...(fundingRes.value.data?.data || {}), _meta: mkMeta(fundingRes.value.data) } : mkFailed(),
-                        legalRisks: legalRes.status === 'fulfilled' ? { ...(legalRes.value.data?.data || {}), _meta: mkMeta(legalRes.value.data) } : mkFailed(),
-                        traction: null, moat: null, exit: null,
+                        legalRisks: null, traction: null, moat: null, exit: null,
                     };
                     setExtIntel(batch1);
 
-                    // Batch 2 fires after Batch 1 is done — Gemini queue is now clear
+                    // Batch 2 (4 sections) fires after Batch 1 is done
                     return Promise.allSettled([
+                        api.post('/run', { extension_id: 'legal-risks', payload: { idea: cleanedText } }, extTimeout2),
                         api.post('/run', { extension_id: 'traction-signals', payload: { idea: cleanedText } }, extTimeout2),
                         api.post('/run', { extension_id: 'moat-analysis', payload: { idea: cleanedText } }, extTimeout2),
                         api.post('/run', { extension_id: 'exit-scenarios', payload: extPayload }, extTimeout2),
-                    ]).then(([tractionRes, moatRes, exitRes]) => {
+                    ]).then(([legalRes, tractionRes, moatRes, exitRes]) => {
                         const extIntelResult = {
                             ...batch1,
+                            legalRisks: legalRes.status === 'fulfilled' ? { ...(legalRes.value.data?.data || {}), _meta: mkMeta(legalRes.value.data) } : mkFailed(),
                             traction: tractionRes.status === 'fulfilled' ? { ...(tractionRes.value.data?.data || {}), _meta: mkMeta(tractionRes.value.data) } : mkFailed(),
                             moat: moatRes.status === 'fulfilled' ? { ...(moatRes.value.data?.data || {}), _meta: mkMeta(moatRes.value.data) } : mkFailed(),
                             exit: exitRes.status === 'fulfilled' ? { ...(exitRes.value.data?.data || {}), _meta: mkMeta(exitRes.value.data) } : mkFailed(),
@@ -952,7 +954,9 @@ ${html}
                         setExtIntel(extIntelResult);
                         setCachedResult(cleanedText, resultData, resultDsData, resultWarData, null, extIntelResult);
                     });
-                }).finally(() => setExtIntelLoading(false));
+                }).finally(() => {
+                    setExtIntelLoading(false);
+                });
             } else {
                 if (response.reason.name === 'CanceledError' || response.reason.name === 'AbortError') {
                     throw new Error('TIMEOUT');
@@ -1455,7 +1459,9 @@ ${html}
                                                         disabled={retryingSection === `deep-${key}`}
                                                         onClick={async () => {
                                                             const sectionId = `deep-${key}`;
-                                                            setRetryingSection(sectionId);
+                                                            startTransition(() => {
+                                                                setRetryingSection(sectionId);
+                                                            });
                                                             const payload = key === 'fin' || key === 'gtm' || key === 'risk'
                                                                 ? extPayloadRef.current
                                                                 : { idea: cleanedTextRef.current };
@@ -1474,7 +1480,9 @@ ${html}
                                                                     [key]: { ...(prev?.[key] || {}), _failed: true }
                                                                 }));
                                                             } finally {
-                                                                setRetryingSection(null);
+                                                                startTransition(() => {
+                                                                    setRetryingSection(null);
+                                                                });
                                                             }
                                                         }}
                                                         className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors flex items-center gap-2 mx-auto"
@@ -1687,7 +1695,9 @@ ${html}
                                                         disabled={retryingSection === `ext-${key}`}
                                                         onClick={async () => {
                                                             const sectionId = `ext-${key}`;
-                                                            setRetryingSection(sectionId);
+                                                            startTransition(() => {
+                                                                setRetryingSection(sectionId);
+                                                            });
                                                             const extIdMap: Record<string, string> = {
                                                                 personas: 'user-persona', redFlags: 'people-analysis',
                                                                 pricing: 'pricing-strategy', funding: 'funding-readiness',
@@ -1710,7 +1720,9 @@ ${html}
                                                                     [key]: { ...(prev?.[key] || {}), _failed: true }
                                                                 }));
                                                             } finally {
-                                                                setRetryingSection(null);
+                                                                startTransition(() => {
+                                                                    setRetryingSection(null);
+                                                                });
                                                             }
                                                         }}
                                                         className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold transition-colors flex items-center gap-2 mx-auto"
