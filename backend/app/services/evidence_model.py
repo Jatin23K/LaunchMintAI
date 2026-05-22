@@ -130,37 +130,37 @@ def extract_market_claims(source_objects: list) -> List[dict]:
             for m in pattern.finditer(text):
                 try:
                     raw_v = float(m.group(1))
-                unit = m.group(2)
-                val_b = _to_billions(raw_v, unit)
-                if not (0.005 < val_b < 10000):
+                    unit = m.group(2)
+                    val_b = _to_billions(raw_v, unit)
+                    if not (0.005 < val_b < 10000):
+                        continue
+
+                    s = max(0, m.start() - 250)
+                    e = min(len(text), m.end() + 250)
+                    window = text[s:e]
+                    # Use year nearest to the match position, not just first in window
+                    anchor_in_window = m.start(1) - s
+                    year, _ = _nearest_year_to(window, anchor_in_window)
+                    is_fc = _is_forecast_context(window, year) if year else False
+
+                    cid += 1
+                    claims.append({
+                        "claim_id": f"size_{cid}",
+                        "claim_type": "forecast_tam" if is_fc else "current_tam",
+                        "raw_text": m.group(0),
+                        "normalized_value": round(val_b, 2),
+                        "unit": "USD_B",
+                        "year": year,
+                        "quote": window[:300],
+                        "source_url": url,
+                        "source_title": title,
+                        "domain_tier": tier,
+                        "status": "verified",
+                        "confidence": conf,
+                        "extraction_method": "regex",
+                    })
+                except (ValueError, TypeError):
                     continue
-
-                s = max(0, m.start() - 250)
-                e = min(len(text), m.end() + 250)
-                window = text[s:e]
-                # Use year nearest to the match position, not just first in window
-                anchor_in_window = m.start(1) - s
-                year, _ = _nearest_year_to(window, anchor_in_window)
-                is_fc = _is_forecast_context(window, year) if year else False
-
-                cid += 1
-                claims.append({
-                    "claim_id": f"size_{cid}",
-                    "claim_type": "forecast_tam" if is_fc else "current_tam",
-                    "raw_text": m.group(0),
-                    "normalized_value": round(val_b, 2),
-                    "unit": "USD_B",
-                    "year": year,
-                    "quote": window[:300],
-                    "source_url": url,
-                    "source_title": title,
-                    "domain_tier": tier,
-                    "status": "verified",
-                    "confidence": conf,
-                    "extraction_method": "regex",
-                })
-            except (ValueError, TypeError):
-                continue
 
         # CAGR
         for m in _CAGR_RE.finditer(text):
