@@ -72,8 +72,8 @@ BLACKLISTED_TITLE_TERMS = [
     "how to", "best ", "tips", "review",
 ]
 
-OLD_YEARS = {"2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022"}
-FRESH_YEARS = {"2024", "2025", "2026", "2030"}
+import datetime
+import re
 
 
 def _is_valid(url: str, title: str) -> bool:
@@ -87,9 +87,19 @@ def _is_valid(url: str, title: str) -> bool:
 
 def _is_outdated(title: str, snippet: str) -> bool:
     combined = (title + " " + snippet).lower()
-    for y in OLD_YEARS:
-        if y in combined and not any(ny in combined for ny in FRESH_YEARS):
-            return True
+    current_year = datetime.datetime.now().year
+    
+    # Find all 4-digit years in the text that are realistic recent years
+    years_found = [int(y) for y in re.findall(r'\b(201\d|202\d|203\d)\b', combined)]
+    
+    if not years_found:
+        return False
+        
+    max_year = max(years_found)
+    # If the absolute newest year mentioned is more than 3 years old, it's outdated.
+    if max_year < current_year - 3:
+        return True
+        
     return False
 
 
@@ -219,7 +229,7 @@ async def search_market_data(idea: str, query: str) -> Dict:
 
     # Stage 1: Exa → market research reports
     logger.info(f"[EXA] Semantic market report search for '{idea}'")
-    exa_results = await _exa_search(f"{query} market size revenue forecast 2025 2030")
+    exa_results = await _exa_search(f"{query} market size revenue forecast")
     if exa_results:
         out = _build_output(exa_results, "Exa Semantic (Tier 0)", idea)
         if out["results_count"] > 0:
@@ -281,7 +291,7 @@ VERIFIED SOURCE FOR CITATION:
 - Source Name: {search_data['top_source_name']}
 
 ===== CRITICAL EXTRACTION RULES =====
-1. ISOLATION: Extract numbers from the sources above. If a specific figure isn't stated, estimate based on your training knowledge and label confidence as "Medium".
+1. ISOLATION: Extract numbers from the sources above. If a specific figure isn't stated, you MUST NOT guess or estimate. Return a placeholder value 'UNSUPPORTED' for that figure.
 2. SUB-MARKET MATCH: Use figures for the EXACT sub-market (e.g., "Employee Onboarding Software"), NOT the parent industry (e.g., "HR Tech" or "HCM"). If only parent-industry numbers exist, scale down proportionally.
 3. SANITY CHECK: TAM for a niche SaaS sub-market is typically $0.5B-$10B, not $50B+. If your number exceeds $20B, verify it's the right sub-market.
 """
