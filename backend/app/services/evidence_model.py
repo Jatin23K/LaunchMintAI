@@ -58,6 +58,11 @@ _SIZE_RE = re.compile(
     re.IGNORECASE,
 )
 
+_SECONDARY_SIZE_RE = re.compile(
+    r'(?:TAM|SAM|SOM|market|size)[^\$]{0,50}?[\$£€]\s*(\d{1,6}(?:\.\d{1,3})?)\s*(trillion|billion|million|tn|bn|mn|T|B|M)\b',
+    re.IGNORECASE,
+)
+
 _CAGR_RE = re.compile(
     r'(\d+(?:\.\d{1,2})?)\s*%\s*(?:CAGR|compound\s+annual\s+growth(?:\s+rate)?)|'
     r'(?:CAGR|compound\s+annual\s+growth(?:\s+rate)?)\s+of\s+(\d+(?:\.\d{1,2})?)\s*%',
@@ -121,40 +126,41 @@ def extract_market_claims(source_objects: list) -> List[dict]:
         conf = _tier_confidence(tier)
 
         # Market size
-        for m in _SIZE_RE.finditer(text):
-            try:
-                raw_v = float(m.group(1))
-                unit = m.group(2)
-                val_b = _to_billions(raw_v, unit)
-                if not (0.005 < val_b < 10000):
+        for pattern in (_SIZE_RE, _SECONDARY_SIZE_RE):
+            for m in pattern.finditer(text):
+                try:
+                    raw_v = float(m.group(1))
+                    unit = m.group(2)
+                    val_b = _to_billions(raw_v, unit)
+                    if not (0.005 < val_b < 10000):
+                        continue
+
+                    s = max(0, m.start() - 250)
+                    e = min(len(text), m.end() + 250)
+                    window = text[s:e]
+                    # Use year nearest to the match position, not just first in window
+                    anchor_in_window = m.start(1) - s
+                    year, _ = _nearest_year_to(window, anchor_in_window)
+                    is_fc = _is_forecast_context(window, year) if year else False
+
+                    cid += 1
+                    claims.append({
+                        "claim_id": f"size_{cid}",
+                        "claim_type": "forecast_tam" if is_fc else "current_tam",
+                        "raw_text": m.group(0),
+                        "normalized_value": round(val_b, 2),
+                        "unit": "USD_B",
+                        "year": year,
+                        "quote": window[:300],
+                        "source_url": url,
+                        "source_title": title,
+                        "domain_tier": tier,
+                        "status": "verified",
+                        "confidence": conf,
+                        "extraction_method": "regex",
+                    })
+                except (ValueError, TypeError):
                     continue
-
-                s = max(0, m.start() - 250)
-                e = min(len(text), m.end() + 250)
-                window = text[s:e]
-                # Use year nearest to the match position, not just first in window
-                anchor_in_window = m.start(1) - s
-                year, _ = _nearest_year_to(window, anchor_in_window)
-                is_fc = _is_forecast_context(window, year) if year else False
-
-                cid += 1
-                claims.append({
-                    "claim_id": f"size_{cid}",
-                    "claim_type": "forecast_tam" if is_fc else "current_tam",
-                    "raw_text": m.group(0),
-                    "normalized_value": round(val_b, 2),
-                    "unit": "USD_B",
-                    "year": year,
-                    "quote": window[:300],
-                    "source_url": url,
-                    "source_title": title,
-                    "domain_tier": tier,
-                    "status": "verified",
-                    "confidence": conf,
-                    "extraction_method": "regex",
-                })
-            except (ValueError, TypeError):
-                continue
 
         # CAGR
         for m in _CAGR_RE.finditer(text):
@@ -189,12 +195,22 @@ def extract_market_claims(source_objects: list) -> List[dict]:
 
 
 def build_fact_table(claims: List[dict]) -> Dict[str, dict]:
-    """Pick the highest-confidence claim per type."""
+    """Pick the highest-confidence claim per type, using recency as a tiebreaker."""
     best: Dict[str, dict] = {}
     for c in claims:
         t = c["claim_type"]
-        if t not in best or c["confidence"] > best[t]["confidence"]:
+        if t not in best:
             best[t] = c
+        else:
+            conf_c = c.get("confidence", 0)
+            conf_b = best[t].get("confidence", 0)
+            year_c = c.get("year") or 0
+            year_b = best[t].get("year") or 0
+            
+            if conf_c > conf_b:
+                best[t] = c
+            elif conf_c == conf_b and year_c > year_b:
+                best[t] = c
     return best
 
 
@@ -266,7 +282,24 @@ def build_provenance(market: dict, claims: List[dict],
         c = fact["forecast_tam"]
         prov["market.forecast_tam"] = _prov("verified", c["source_url"], c["quote"], c.get("year"))
     elif fact.get("current_tam") and market.get("growth") and not _is_placeholder(ftam):
-        prov["market.forecast_tam"] = _prov("estimated", notes="Derived: current TAM × CAGR × years")
+        try:
+            curr_tam_val = float(fact["current_tam"]["normalized_value"])
+            cagr_raw = str(market.get("growth", "0")).replace("%", "")
+            cagr_val = float(cagr_raw)
+            expected_ftam = curr_tam_val * ((1 + (cagr_val / 100)) ** 5)
+            
+            try:
+                llm_ftam = float(str(ftam).replace("$", "").replace("B", "").strip())
+                if expected_ftam > 0 and abs(llm_ftam - expected_ftam) / expected_ftam > 0.10:
+                    market["forecast_tam"] = str(round(expected_ftam, 2))
+                    prov["market.forecast_tam"] = _prov("estimated", notes="[MATH OVERRIDE] Corrected LLM hallucination: current TAM × CAGR × 5 years")
+                else:
+                    prov["market.forecast_tam"] = _prov("estimated", notes="Derived: current TAM × CAGR × 5 years")
+            except ValueError:
+                market["forecast_tam"] = str(round(expected_ftam, 2))
+                prov["market.forecast_tam"] = _prov("estimated", notes="[MATH OVERRIDE] Fixed invalid LLM value via math")
+        except Exception:
+            prov["market.forecast_tam"] = _prov("estimated", notes="Derived: current TAM × CAGR × years")
     elif _is_placeholder(ftam):
         prov["market.forecast_tam"] = _prov("unsupported", notes="No source evidence; field left empty")
     else:
