@@ -1497,7 +1497,42 @@ ${html}
                                             {!(deepIntel[key as keyof typeof deepIntel] as any)?._failed && deepIntel[key as keyof typeof deepIntel]?.error && (
                                                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-center">
                                                     <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
-                                                    <p className="text-slate-400 text-xs">Analysis unavailable — LLM did not return valid data for this section.</p>
+                                                    <p className="text-slate-400 text-xs mb-3">Analysis unavailable — LLM did not return valid data for this section.</p>
+                                                    <button
+                                                        disabled={retryingSection === `deep-${key}`}
+                                                        onClick={async () => {
+                                                            const sectionId = `deep-${key}`;
+                                                            startTransition(() => {
+                                                                setRetryingSection(sectionId);
+                                                            });
+                                                            const payload = key === 'fin' || key === 'gtm' || key === 'risk'
+                                                                ? extPayloadRef.current
+                                                                : { idea: cleanedTextRef.current };
+                                                            const extId = key === 'fin' ? 'financial-projection' : key === 'gtm' ? 'gtm-strategy' : 'risk-scanner';
+                                                            try {
+                                                                const res = await api.post('/run', { extension_id: extId, payload }, { timeout: 180000 });
+                                                                setDeepIntel((prev: any) => ({
+                                                                    ...prev,
+                                                                    [key]: { ...(res.data?.data || {}), _failed: false, _meta: { provenance_level: res.data?.provenance_level, evidence_used: res.data?.evidence_used } }
+                                                                }));
+                                                            } catch (err: any) {
+                                                                console.error(`[Retry] deep-${key} failed:`, err?.response?.data?.detail || err?.message);
+                                                                setDeepIntel((prev: any) => ({
+                                                                    ...prev,
+                                                                    [key]: { ...(prev?.[key] || {}), _failed: true }
+                                                                }));
+                                                            } finally {
+                                                                startTransition(() => {
+                                                                    setRetryingSection(null);
+                                                                });
+                                                            }
+                                                        }}
+                                                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 rounded-lg text-slate-300 text-xs font-bold transition-colors flex items-center gap-2 mx-auto"
+                                                    >
+                                                        {retryingSection === `deep-${key}` ? (
+                                                            <><svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Retrying...</>
+                                                        ) : <>↻ Try Again</>}
+                                                    </button>
                                                 </div>
                                             )}
                                             {key === 'fin' && deepIntel.fin && !deepIntel.fin.error && (
