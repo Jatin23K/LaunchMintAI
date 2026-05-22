@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
     Rocket, Sparkles, Flame, Presentation, Activity, CheckCircle2
 } from 'lucide-react';
@@ -9,11 +9,11 @@ import NeuralBackground from './components/NeuralBackground';
 import { RecentIntel } from './components/HUD';
 import HistoryDrawer from './components/HistoryDrawer';
 
-// Features
-import ValidatorApp from './features/validator/Validator';
-import VCRoastApp from './features/vc-roast/VCRoast';
-import PitchForgeApp from './features/pitch-forge/PitchForge';
-import DeltaAnalysisApp from './features/delta-analysis/DeltaAnalysis';
+// Features (Lazy Loaded)
+const ValidatorApp = lazy(() => import('./features/validator/Validator'));
+const VCRoastApp = lazy(() => import('./features/vc-roast/VCRoast'));
+const PitchForgeApp = lazy(() => import('./features/pitch-forge/PitchForge'));
+const DeltaAnalysisApp = lazy(() => import('./features/delta-analysis/DeltaAnalysis'));
 
 // Types
 import { RealData } from './types';
@@ -191,17 +191,28 @@ export default function App() {
                             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                             className="w-full h-full flex flex-col items-center"
                         >
-                            {screen === 'VALIDATOR' && (
-                                <ValidatorApp
-                                    onSave={saveToArchive}
-                                    data={activeReport}
-                                    setData={setActiveReport}
-                                    setStatus={setSystemStatus}
-                                />
-                            )}
-                            {screen === 'VC_ROAST' && <VCRoastApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
-                            {screen === 'PITCH_FORGE' && <PitchForgeApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
-                            {screen === 'BATTLE_ROOM' && <DeltaAnalysisApp archive={archive} setArchive={setArchive} />}
+                            <Suspense fallback={
+                                <div className="w-full h-[50vh] flex flex-col items-center justify-center space-y-4">
+                                    <div className="relative w-16 h-16">
+                                        <div className="absolute inset-0 rounded-full border-t-2 border-cyan-400 animate-spin"></div>
+                                        <div className="absolute inset-2 rounded-full border-r-2 border-purple-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.7s' }}></div>
+                                        <Rocket className="absolute inset-0 m-auto w-6 h-6 text-slate-400 animate-pulse" />
+                                    </div>
+                                    <div className="text-slate-400 font-mono text-sm uppercase tracking-widest animate-pulse">Initializing Module...</div>
+                                </div>
+                            }>
+                                {screen === 'VALIDATOR' && (
+                                    <ValidatorApp
+                                        onSave={saveToArchive}
+                                        data={activeReport}
+                                        setData={setActiveReport}
+                                        setStatus={setSystemStatus}
+                                    />
+                                )}
+                                {screen === 'VC_ROAST' && <VCRoastApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
+                                {screen === 'PITCH_FORGE' && <PitchForgeApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
+                                {screen === 'BATTLE_ROOM' && <DeltaAnalysisApp archive={archive} setArchive={setArchive} />}
+                            </Suspense>
                         </motion.div>
                     </AnimatePresence>
                 </div>
