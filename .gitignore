@@ -21,6 +21,8 @@ backend/logs/
 generated_reports/
 *.log
 *.txt
+!requirements.txt
+!backend/requirements.txt
 *.csv
 # Ensure specific stress logs are caught
 backend/logs/stress_*.txt
