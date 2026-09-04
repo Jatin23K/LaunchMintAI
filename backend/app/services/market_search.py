@@ -4,7 +4,10 @@ Provides real-time, grounded market intelligence with Elite Source Tiering.
 """
 
 import os
-from tavily import TavilyClient
+try:
+    from tavily import TavilyClient
+except ImportError:
+    TavilyClient = None
 from typing import Dict, List, Optional
 import logging
 
@@ -32,6 +35,8 @@ def get_next_tavily_key():
     return key
 
 def get_tavily_client():
+    if TavilyClient is None:
+        return None
     key = get_next_tavily_key()
     if not key: return None
     return TavilyClient(api_key=key)
