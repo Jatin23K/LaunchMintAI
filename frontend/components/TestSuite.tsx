@@ -235,7 +235,7 @@ export const TestSuite: React.FC = () => {
         // CRITICAL FIX: Ensure the raw report has the audit data attached
         // before passing it to the check function.
         if (raw) {
-            raw.audit = validated as any;
+            raw.audit = validated;
         }
 
         const ok = t.check(raw);
