@@ -496,199 +496,95 @@ export interface CompetitorDeepDiveResult {
 // --- LaunchMintAI Premium Types ---
 
 export interface Competitor {
-  name: string;
-  weakness: string;
-  url: string;
-  market_fin: {
-    funding: string;
-    investors: string;
-    management: string;
-    share?: string;
-    audience?: string
-  };
-  product_intel: {
-    pricing: string;
-    features: string;
-    swot: string;
-    ux_friction?: string
-  };
-  technical_infra: {
-    stack: string;
-    velocity: string;
-    platform: string
-  };
-  sentiment: {
-    complaints: string;
-    trust_score: string;
-    churn_drivers: string
-  };
-  marketing: {
-    acquisition: string;
-    seo_keywords: string;
-    social_status: string
-  };
-  kill_strategy: string;
+    name: string;
+    weakness: string;
+    url: string;
+    market_fin: { 
+        funding: string; 
+        investors: string; 
+        management: string; 
+        share?: string; 
+        audience?: string 
+    };
+    product_intel: { 
+        pricing: string; 
+        features: string; 
+        swot: string; 
+        ux_friction?: string 
+    };
+    technical_infra: { 
+        stack: string; 
+        velocity: string; 
+        platform: string 
+    };
+    sentiment: { 
+        complaints: string; 
+        trust_score: string; 
+        churn_drivers: string 
+    };
+    marketing: { 
+        acquisition: string; 
+        seo_keywords: string; 
+        social_status: string 
+    };
+    kill_strategy: string;
 }
 
 export interface ForensicMetadata {
-  confidence_score: number;
-  veracity_index: number;
-  source_diversity: number;
-  reasoning_trace: string[];
-  bias_assessment: string;
+    confidence_score: number;
+    veracity_index: number;
+    source_diversity: number;
+    reasoning_trace: string[];
+    bias_assessment: string;
 }
 
 export interface RealData {
-  idea?: string;
-  timestamp?: number;
-  market: {
-    size: string;
-    current_tam?: string | null;
-    forecast_tam?: string | null;
-    current_year?: string;
-    forecast_year?: string;
-    growth: string | null;
-    confidence: string;
-    source_url: string;
-    source_name: string;
-    veracity_quote?: string;
-    timing?: { label: string; rationale: string; };
-    classified_industry?: string;
-  };
-  monetization?: { model: string; strategy: string; };
-  competitors: Competitor[];
-  forensics?: ForensicMetadata;
-  dept_legal?: string[];
-  dept_product?: string[];
-  dept_marketing?: string[];
-  dept_finance?: string[];
-  god_mode?: {
-    macro_verdict: string;
-    swarm_summary: string;
-    risk_score: string;
-    pivot_warning?: string;
-  };
-  gen_ui?: { feature: string; desc: string; };
-  pivot_suggestion?: { idea: string; potential: string; rationale: string; };
-  citations?: { title: string; url: string; }[];
-  idea_analysis?: string;
-  // Evidence & credibility layer (additive — always optional)
-  evidence?: {
-    sources: EvidenceSource[];
-    claims: EvidenceClaim[];
-  };
-  field_provenance?: Record<string, FieldProvenance>;
-  credibility?: ReportCredibilityMeta;
-  report_status?: "complete" | "partial_grounded" | "partial_inferred" | "failed_validation";
+    idea?: string;
+    market: {
+        size: string;
+        current_tam?: string;
+        forecast_tam?: string;
+        current_year?: string;
+        forecast_year?: string;
+        growth: string;
+        confidence: string;
+        source_url: string;
+        source_name: string;
+        veracity_quote?: string;
+        timing?: { label: string; rationale: string; };
+        classified_industry?: string;
+    };
+    monetization?: { model: string; strategy: string; };
+    competitors: Competitor[];
+    forensics?: ForensicMetadata;
+    dept_legal?: string[]; 
+    dept_product?: string[]; 
+    dept_marketing?: string[]; 
+    dept_finance?: string[];
+    god_mode?: { 
+        macro_verdict: string; 
+        swarm_summary: string; 
+        risk_score: string; 
+        pivot_warning?: string; 
+    };
+    gen_ui?: { feature: string; desc: string; };
+    pivot_suggestion?: { idea: string; potential: string; rationale: string; };
+    citations?: { title: string; url: string; }[];
+    idea_analysis?: string;
 }
 
-export interface PitchForgeData {
-  tagline: string;
-  elevator_pitch: string;
-  tweet_thread_hook: string;
-  cold_email_subject: string;
-  value_proposition: string;
+export interface PitchForgeData { 
+    tagline: string; 
+    elevator_pitch: string; 
+    tweet_thread_hook: string; 
+    cold_email_subject: string; 
+    value_proposition: string; 
 }
 
-// DS Layer Interfaces
-export interface SurvivalData {
-  survival_probability: number;
-  confidence_band: [number, number];
-  risk_tier: string;
-  top_risk_factors: string[];
-  similar_winners: string[];
-  similar_losers: string[];
-  model_semantics?: string;
-  provenance_level?: string;
-  data_note?: string;
-  feature_explanation?: {
-    sector: string;
-    is_b2b: boolean;
-    has_ai_keyword: boolean;
-    rule_applied: string;
-    confidence_band_method: string;
-    training_note: string;
-  };
-}
-
-export interface FinancialsData {
-  bear: { label: string; runway_months: number; };
-  base: { label: string; runway_months: number; };
-  bull: { label: string; runway_months: number; };
-  breakeven_probability: number;
-  ltv_cac_ratio: number;
-  simulations_run: number;
-  assumption_source?: string;
-}
-
-interface SentimentCompetitor {
-  name: string;
-  pain_score: number;
-  top_complaints: string[];
-  kill_strategy: string;
-}
-
-export interface DSInsightsData {
-  survival: SurvivalData;
-  financials: FinancialsData;
-  sentiment: { competitors: SentimentCompetitor[], signal_source?: string };
-  meta: { pipeline_latency_ms: number, evidence_policy?: string };
-}
-
-export interface VCRoastData {
-  kill_shot: string;
-  brutal_feedback: string[];
-  competitor_alert: string;
-  investment_verdict: string;
-  survival_chance: number;
-  survival_benchmark?: string;
-}
-
-// ── Evidence & Provenance (Validator credibility layer) ───────────────────────
-
-export type ClaimStatus = "verified" | "estimated" | "inferred" | "unsupported";
-export type CredibilityStatus = ClaimStatus;
-
-export interface EvidenceSource {
-  url: string;
-  title: string;
-  domain: string;
-}
-
-export interface EvidenceClaim {
-  claim_id: string;
-  claim_type: "current_tam" | "forecast_tam" | "cagr" | string;
-  raw_text: string;
-  normalized_value: number;
-  unit: "USD_B" | "PCT" | string;
-  year: number | null;
-  quote: string;
-  source_url: string;
-  source_title: string;
-  domain_tier: "tier1" | "tier2" | "tier3";
-  status: ClaimStatus;
-  confidence: number;
-  extraction_method: "regex" | "derived" | "llm";
-}
-
-export interface FieldProvenance {
-  status: ClaimStatus;
-  source_url: string;
-  source_title?: string;
-  source_quote: string;
-  source_year: number | null;
-  notes: string;
-}
-
-export interface ReportCredibilityMeta {
-  verified_fields: string[];
-  estimated_fields: string[];
-  inferred_fields: string[];
-  unsupported_fields: string[];
-  grounded_fields: string[];
-  conflicts_detected: string[];
-  stale_sources: string[];
-  generated_at: string;
-  overall_score: number;
-  claims_extracted: number;
+export interface VCRoastData { 
+    kill_shot: string; 
+    brutal_feedback: string[]; 
+    competitor_alert: string; 
+    investment_verdict: string; 
+    survival_chance: number; 
 }

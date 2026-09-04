@@ -1,57 +1,54 @@
-# ── Python ──────────────────────────────────────────────────────────────────
-__pycache__/
-*.py[cod]
-*.pyo
+# --- AI & Environment ---
+.claude/
 .venv/
 venv/
 backend/venv/
-
-# ── Environment & Secrets ────────────────────────────────────────────────────
+frontend/node_modules/
 .env
-.env.local
-.env.*.local
+__pycache__/
+.vscode/
 
-# ── Databases ────────────────────────────────────────────────────────────────
+# --- Databases (CRITICAL) ---
 *.db
 *.sqlite3
 backend/chroma_data/
+backend/*.db
+backend/launchmint.db
+backend/launchmint_intelligence.db
+
+# --- Project Specific Logs & Reports ---
 backend/logs/
-
-# ── Frontend Build ───────────────────────────────────────────────────────────
-frontend/node_modules/
-frontend/dist/
-node_modules/
-
-# ── IDE ──────────────────────────────────────────────────────────────────────
-.vscode/
-.idea/
-*.swp
-
-# ── OS ───────────────────────────────────────────────────────────────────────
-.DS_Store
-Thumbs.db
-
-# ── Misc Dev Files ───────────────────────────────────────────────────────────
-scratch/
 generated_reports/
 *.log
+*.txt
+!requirements.txt
+!backend/requirements.txt
+*.csv
+# Ensure specific stress logs are caught
+backend/logs/stress_*.txt
+backend/logs/backend_logs.txt
+
+# --- Build & Distribution ---
+node_modules/
+bin/
+/data/
+backend/data/*.csv
+backend/data/processed/*.parquet
+!backend/data/processed/eval_benchmark_results.json
+!backend/data/eda_plots/
+build/
+dist/
+*.exe
+*.bin
+*.zip
+*.apk
+
+# --- Legacy & Temporary Assets ---
+OLD UI IMAGES/
+scratch/
 hs_err_pid*
+replay_pid*
 
-# ── AI Tooling ───────────────────────────────────────────────────────────────
-.claude/
-CLAUDE.md
-AGENTS.md
-
-# ── DO NOT IGNORE (eval artifacts must be in repo) ───────────────────────────
-# backend/app/ds/models/*.pkl  → committed (trained model)
-# backend/app/ds/eval/         → committed (proof layer)
-# backend/app/ds/eval/results/ → committed
-# backend/app/ds/eval/charts/  → committed
-other projects/
-
-# ── Interview Prep Docs (local only, not for repo) ───────────────────────────
-*_EXPLAINER.md
-DEPLOYMENT.md
-NEXT_STEPS.md
-INTERVIEW.md
-PORTFOLIO_PRESENTATION.md
+# --- OS Specific ---
+.DS_Store
+Thumbs.db

@@ -1,0 +1,28 @@
+{
+  "evaluation_dataset_size": 30,
+  "verticals_covered": 11,
+  "baseline_raw_llm": {
+    "mean_faithfulness_groundedness": 0.6642,
+    "mean_context_precision": 0.5618,
+    "mean_answer_relevance": 0.8857,
+    "hallucination_rate": "33.3%",
+    "numerical_error_rate": "36.7%",
+    "mean_latency_ms": 1450.0,
+    "p95_latency_ms": 1450.0
+  },
+  "launchmint_ai_platinum": {
+    "mean_faithfulness_groundedness": 0.9576,
+    "mean_context_precision": 0.9181,
+    "mean_answer_relevance": 0.9582,
+    "hallucination_rate": "0.0%",
+    "numerical_error_rate": "10.0%",
+    "mean_latency_ms": 385.0,
+    "p95_latency_ms": 385.0
+  },
+  "benchmark_deltas": {
+    "faithfulness_uplift": "+29.3%",
+    "context_precision_uplift": "+35.6%",
+    "hallucination_reduction": "-33.3%",
+    "latency_reduction": "-73.4%"
+  }
+}

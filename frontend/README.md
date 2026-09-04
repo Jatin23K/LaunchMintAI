@@ -1,38 +1,45 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# LaunchMintAI: Frontend Tactical Interface 🚀
 
-# Run and deploy your AI Studio app
+> **Version**: 2.0.0  
+> **Framework**: React 19 + TypeScript + Vite 6 + Tailwind CSS  
+> **Backend Integration**: Communicates with FastAPI on `http://127.0.0.1:8000`  
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/drive/1OEnq2QhDDST8FhP-GUz4ZYDG2BqIM5JD
+## 📌 Architecture Overview
 
-## Run Locally
+The LaunchMintAI frontend is a tactical research terminal designed for early-stage venture validation. It features:
+* **VC Roast Engine**: Queries the live Day-0 XGBoost endpoint (`POST /predict_survival`) to display real calibrated survival percentages, risk tiers, and positive/risk SHAP drivers.
+* **Validator HUD**: Interactive research workspace showing TAM, CAGR, competitor matrices, and grounded citations.
+* **War Room & Strategy Panels**: Interactive competitor vulnerability exploration and tactical priority maps.
 
-**Prerequisites:**  Node.js
+---
 
+## 🛠️ Installation & Setup
 
-1. Install dependencies:
-   `npm install`
-   
-2. Configure API Keys in `.env.local`:
-   
-   **Option A - Single API (Recommended for most users):**
-   ```
-   VITE_GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-   
-   **Option B - Dual API with Fallback (Advanced):**
-   ```
-   VITE_PRIMARY_AI_API_KEY=your_primary_google_ai_key
-   VITE_GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-   
-   Get your API key from: https://aistudio.google.com/apikey
-   
-   > **Note:** The system supports automatic fallback. If both keys are configured, it will use the PRIMARY API first and automatically switch to GEMINI if it fails. Both use the latest `gemini-2.0-flash-exp` model.
+### 1. Install Dependencies
+```bash
+npm install
+```
 
-3. Run the app:
-   `npm run dev`
+### 2. Environment Configuration (`.env`)
+Create a `.env` file in the `frontend/` directory:
+```env
+# URL for the FastAPI backend engine:
+VITE_API_BASE_URL=http://127.0.0.1:8000
 
+# Google AI Studio Gemini Key (for client-side streaming/chat if enabled):
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+### 3. Development Server
+```bash
+npm run dev
+```
+The interface runs at `http://localhost:5173`.
+
+### 4. Production Build Verification
+```bash
+npm run build
+```
+Ensures all TypeScript types, React components, and asset bundles compile with zero errors.

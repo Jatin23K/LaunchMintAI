@@ -45,5 +45,4 @@ class Extension:
         try:
             return json.loads(result_json)
         except:
-            # PAID KEY: line below is safe to delete — paid models return clean JSON, parse errors are a free-tier artifact
             return {"error": "JSON Parse Error", "raw": result_json}
