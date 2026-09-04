@@ -105,7 +105,7 @@ def analyze_competitor_vulnerability(
         count = len(data["sentences"])
         
         if count > 0:
-            avg_polarity = float(np.mean(data["compound_scores"])) if 'np' in globals() else sum(data["compound_scores"]) / count
+            avg_polarity = float(sum(data["compound_scores"]) / count)
             pain_density = float(data["neg_count"] / count)
         else:
             avg_polarity = 0.0

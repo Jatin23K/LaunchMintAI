@@ -1,6 +1,3 @@
-import sys
-import os
-
 # Add the backend directory to sys.path so we can import app modules
 import sys
 import os
