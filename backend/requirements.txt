@@ -20,3 +20,4 @@ matplotlib>=3.8.0
 joblib
 shap
 redis>=5.0.1
+tavily-python>=0.3.0
