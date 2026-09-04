@@ -173,6 +173,37 @@ GET /eval_metrics
 
 ---
 
+## 📂 Repository Structure
+
+```text
+LaunchMintAI/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                     # FastAPI application gateway & REST endpoints
+│   │   ├── services/
+│   │   │   ├── survival_engine.py      # Day-0 XGBoost survival classifier & SHAP explainer
+│   │   │   ├── monte_carlo_engine.py   # Vectorized 10,000-run NumPy cash simulation (<32ms)
+│   │   │   ├── sentiment_nlp_engine.py # VADER Aspect-Based Sentiment Analysis (Pricing/Uptime/Support)
+│   │   │   ├── market_search.py        # 3-Tier domain authority waterfall search (Tavily)
+│   │   │   └── evidence_model.py       # Deterministic regex fact extraction & credibility scoring
+│   │   └── models/artifacts/           # Serialized XGBoost model bundle (.joblib)
+│   ├── data/
+│   │   ├── eda_plots/                  # 6 empirical figures (ROC-AUC, SHAP, Monte Carlo, RAG Triad)
+│   │   └── processed/                  # Serialized benchmark outputs (eval_benchmark_results.json)
+│   └── scripts/
+│       ├── models/                     # Day-0 model training & validation pipeline
+│       └── eval/                       # Deterministic RAG Triad benchmark suite
+├── frontend/
+│   ├── features/                       # Tactical UI modules (VC Roast, War Room, Validator, Pitch Forge)
+│   └── services/geminiService.ts       # Frontend API bridge & multi-agent routing
+├── docs/
+│   ├── ARCHITECTURE_SPEC.md            # Exhaustive 5-layer engineering & mathematical specification
+│   └── README.md                       # Developer setup & local execution guide
+└── LAUNCHMINT_DOCUMENTATION.md         # Applied DS Case Study, Target Leakage Post-Mortem & Defense Guide
+```
+
+---
+
 ## 🚀 Quickstart & Local Setup
 
 ### 1. Prerequisites
