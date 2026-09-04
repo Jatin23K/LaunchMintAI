@@ -82,7 +82,7 @@ export const streamFoundersCopilot = async (idea: string, mode: 'report' | 'tool
 };
 
 // ... Tool Runner ...
-export const runStandaloneTool = async (toolName: any, input: any, schema: any, fallback: any) => {
+export const runStandaloneTool = async <TInput = any, TOutput = any>(toolName: any, input: TInput, schema: any, fallback: any): Promise<TOutput> => {
     const extId = AGENT_MAP[TOOLS[toolName as keyof typeof TOOLS].agent] || 'competitor-deepdive';
     try { return await callPythonBackend(extId, input); }
     catch (e) { return fallback; }
@@ -94,4 +94,4 @@ export const runIdeaThroughSystem = async (idea: string) => {
     return report as StartupReport;
 };
 
-export const validateAndRepairPhase3 = (r: any) => ({ schemaVersion: "1.0.0", confidenceScore: "High", auditScore: 100, inconsistencies: [], fixes: [], executionChecks: [] });
+export const validateAndRepairPhase3 = (r: any) => ({ schemaVersion: "1.0.0", confidenceScore: "High" as const, auditScore: 100, inconsistencies: [], fixes: [], executionChecks: [] });
