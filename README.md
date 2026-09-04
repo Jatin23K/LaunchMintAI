@@ -224,11 +224,11 @@ python -m scripts.eval.rag_triad_benchmark
 
 ---
 
-## 📚 Technical Documentation & Interview Guides
+## 📚 Technical Documentation
 
 * [`LAUNCHMINT_DOCUMENTATION.md`](LAUNCHMINT_DOCUMENTATION.md): Applied Data Science forensic post-mortem, target leakage analysis, and technical defense guide for Senior Applied DS interviews.
-* [`documentation_launchmint_ai.md`](documentation_launchmint_ai.md): Comprehensive 5-layer engineering specification.
-* [`preparation.html`](preparation.html): Interactive dark-mode interview study guide with 20 defense questions.
+* [`docs/ARCHITECTURE_SPEC.md`](docs/ARCHITECTURE_SPEC.md): Comprehensive 5-layer system and data science engineering specification.
+* [`docs/README.md`](docs/README.md): Quickstart setup and developer environment guide.
 
 ---
 
