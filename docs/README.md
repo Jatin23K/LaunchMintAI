@@ -116,4 +116,4 @@ All benchmark figures and JSON results will output to:
 
 For full architectural specifications, target leakage audits, and statistical defenses, refer to:
 * [`LAUNCHMINT_DOCUMENTATION.md`](../LAUNCHMINT_DOCUMENTATION.md): Applied Data Science case study, flaw post-mortem, and senior interview guide.
-* [`documentation_launchmint_ai.md`](../documentation_launchmint_ai.md): Complete 5-layer engineering specification.
+* [`ARCHITECTURE_SPEC.md`](ARCHITECTURE_SPEC.md): Complete 5-layer engineering specification.
