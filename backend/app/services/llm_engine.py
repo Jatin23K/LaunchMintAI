@@ -20,7 +20,10 @@ from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 import concurrent.futures
 
-import redis
+try:
+    import redis
+except ImportError:
+    redis = None
 
 # ── OPT 1: Redis or In-Memory Response Cache ────────────────────────────
 _CACHE_TTL = 86400  # 24 hours
@@ -28,7 +31,7 @@ _CACHE_TTL = 86400  # 24 hours
 # Try to initialize Upstash Redis
 redis_url = os.environ.get("REDIS_URL")
 redis_client = None
-if redis_url:
+if redis_url and redis is not None:
     try:
         redis_client = redis.from_url(redis_url)
         # Ping to verify connection
@@ -106,7 +109,11 @@ from services.evidence_model import (
     build_credibility_meta,
     determine_report_status,
 )
-import app.ds.pipeline as ds_pipeline
+
+try:
+    import app.ds.pipeline as ds_pipeline
+except ImportError:
+    ds_pipeline = None
 
 load_dotenv()
 
@@ -2375,6 +2382,15 @@ def call_gemini_fast(prompt: str) -> str:
             return result
     result = _gemini_request(prompt, SECONDARY_MODEL, _KEY_POOL[(off + 1) % len(_KEY_POOL)], timeout=60)
     return result if result else "{}"
+
+
+async def startup_event():
+    """Initializes SQLite database and tables on startup."""
+    try:
+        from services.database import create_db_and_tables
+        create_db_and_tables()
+    except Exception as e:
+        print(f"[DB] Startup DB init warning: {e}")
 
 
 if __name__ == "__main__":
