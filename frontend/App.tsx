@@ -1,24 +1,22 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import {
-    Rocket, Sparkles, Flame, Presentation, Activity, CheckCircle2
+import React, { useState, useEffect } from 'react';
+import { 
+    Rocket, Sparkles, Flame, Presentation, Briefcase, Activity, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Components
 import NeuralBackground from './components/NeuralBackground';
-import { RecentIntel } from './components/HUD';
-import HistoryDrawer from './components/HistoryDrawer';
+import { LeftHud, RightHud, RecentIntel } from './components/HUD';
 
-// Features (Lazy Loaded)
-const ValidatorApp = lazy(() => import('./features/validator/Validator'));
-const VCRoastApp = lazy(() => import('./features/vc-roast/VCRoast'));
-const PitchForgeApp = lazy(() => import('./features/pitch-forge/PitchForge'));
-const DeltaAnalysisApp = lazy(() => import('./features/delta-analysis/DeltaAnalysis'));
+// Features
+import ValidatorApp from './features/validator/Validator';
+import VCRoastApp from './features/vc-roast/VCRoast';
+import PitchForgeApp from './features/pitch-forge/PitchForge';
+import WarRoomApp from './features/war-room/WarRoom';
+import DeltaAnalysisApp from './features/delta-analysis/DeltaAnalysis';
 
 // Types
 import { RealData } from './types';
-import { Clock as ClockIcon } from 'lucide-react';
-import { warmupBackend } from './services/api';
 
 // --- GLOBAL STYLES ---
 const globalStyles = `
@@ -43,37 +41,17 @@ const globalStyles = `
     .no-print { display: none !important; }
   }
   .print-only { display: none; }
-  @keyframes shimmer {
-    100% { transform: translateX(100%); }
-  }
 `;
 
 export default function App() {
-    const [screen, setScreen] = useState<'VALIDATOR' | 'VC_ROAST' | 'PITCH_FORGE' | 'BATTLE_ROOM'>('VALIDATOR');
+    const [screen, setScreen] = useState<'VALIDATOR' | 'VC_ROAST' | 'PITCH_FORGE' | 'WAR_ROOM' | 'BATTLE_ROOM'>('VALIDATOR');
     const [activeReport, setActiveReport] = useState<RealData | null>(null);
     const [systemStatus, setSystemStatus] = useState<'idle' | 'processing' | 'active'>('idle');
     const [showSaveToast, setShowSaveToast] = useState(false);
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [archive, setArchive] = useState<RealData[]>(() => {
-        try {
-            const saved = localStorage.getItem('launchmint_archive');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            console.error('Failed to parse archive from localStorage:', e);
-            localStorage.removeItem('launchmint_archive');
-            return [];
-        }
+        const saved = localStorage.getItem('launchmint_archive');
+        return saved ? JSON.parse(saved) : [];
     });
-
-    // Keep-alive: ping backend every 10 minutes while tab is open.
-    // Render free tier sleeps after 15 minutes of inactivity — this prevents that.
-    useEffect(() => {
-        warmupBackend(); // immediate ping on load
-        const keepAlive = setInterval(() => {
-            warmupBackend();
-        }, 10 * 60 * 1000); // every 10 minutes
-        return () => clearInterval(keepAlive); // cleanup on unmount
-    }, []);
 
     useEffect(() => {
         localStorage.setItem('launchmint_archive', JSON.stringify(archive));
@@ -83,14 +61,10 @@ export default function App() {
         if (!report.idea) return;
         setArchive(prev => {
             if (prev.find(a => a.idea === report.idea)) return prev;
-            return [report, ...prev].slice(0, 50);
+            return [report, ...prev].slice(0, 10);
         });
         setShowSaveToast(true);
         setTimeout(() => setShowSaveToast(false), 3000);
-    };
-
-    const deleteFromArchive = (idea: string) => {
-        setArchive(prev => prev.filter(a => a.idea !== idea));
     };
 
     const getThemeColor = () => {
@@ -98,28 +72,20 @@ export default function App() {
             case 'VALIDATOR': return 'emerald';
             case 'VC_ROAST': return 'red';
             case 'PITCH_FORGE': return 'amber';
+            case 'WAR_ROOM': return 'violet';
             case 'BATTLE_ROOM': return 'cyan';
             default: return 'emerald';
         }
     };
 
     return (
-        <div className="relative min-h-screen flex flex-col overflow-x-hidden text-white font-sans selection:bg-cyan-500/30">
+        <div className="relative min-h-screen flex flex-col overflow-x-hidden bg-[#020617] text-white font-sans selection:bg-cyan-500/30">
             <style>{globalStyles}</style>
 
             <NeuralBackground color={getThemeColor()} />
 
-            <HistoryDrawer 
-                isOpen={isHistoryOpen} 
-                onClose={() => setIsHistoryOpen(false)} 
-                archive={archive} 
-                onDelete={deleteFromArchive}
-                onSelect={(r) => {
-                    setScreen('VALIDATOR');
-                    setActiveReport(r);
-                    setSystemStatus('active');
-                }}
-            />
+            <LeftHud status={systemStatus} />
+            <RightHud status={systemStatus} />
 
             <AnimatePresence>
                 {showSaveToast && (
@@ -135,7 +101,7 @@ export default function App() {
                 )}
             </AnimatePresence>
 
-            <div className="no-print relative z-50 w-full px-6 md:px-8 pt-6 flex justify-between items-center">
+            <div className="no-print relative z-50 w-full px-6 md:px-8 pt-6 flex justify-center md:justify-start items-center">
                 <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -144,15 +110,6 @@ export default function App() {
                     <Rocket className="w-6 h-6 md:w-8 md:h-8 text-purple-500" />
                     <span>Launchmint <span className="text-slate-400">AI</span></span>
                 </motion.div>
-
-                <motion.button
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    onClick={() => setIsHistoryOpen(true)}
-                    className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition-all shadow-xl backdrop-blur-md group"
-                >
-                    <ClockIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                </motion.button>
             </div>
 
             <main className="flex-1 flex flex-col items-center justify-center w-full relative z-10 pt-20">
@@ -161,7 +118,8 @@ export default function App() {
                         { id: 'VALIDATOR', icon: Sparkles, label: 'Validator', color: 'text-emerald-400' },
                         { id: 'VC_ROAST', icon: Flame, label: 'Roast', color: 'text-red-400' },
                         { id: 'PITCH_FORGE', icon: Presentation, label: 'Forge', color: 'text-amber-400' },
-                        { id: 'BATTLE_ROOM', icon: Activity, label: 'Battle Room', color: 'text-cyan-400' }
+                        { id: 'WAR_ROOM', icon: Briefcase, label: 'War Room', color: 'text-violet-400' },
+                        { id: 'BATTLE_ROOM', icon: Activity, label: 'Delta', color: 'text-cyan-400' }
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -187,49 +145,25 @@ export default function App() {
                 <div className={`w-full flex-1 flex flex-col ${!activeReport && systemStatus === 'idle' ? 'justify-center' : ''}`}>
                     <AnimatePresence mode="wait">
                         <motion.div
-                            key={screen}
+                            key={screen + (activeReport?.idea || '')}
                             initial={{ opacity: 0, scale: 0.98, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 1.02, y: -10 }}
                             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                             className="w-full h-full flex flex-col items-center"
                         >
-                            <Suspense fallback={
-                                <div className="w-full h-full flex flex-col items-center justify-center min-h-[60vh] p-4 md:p-8">
-                                    <div className="w-full max-w-4xl bg-slate-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
-                                        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_1.5s_infinite]"></div>
-                                        <div className="flex items-center gap-4 mb-8">
-                                            <div className="w-12 h-12 bg-slate-800/50 rounded-2xl animate-pulse"></div>
-                                            <div className="space-y-2">
-                                                <div className="h-5 w-48 bg-slate-800/50 rounded animate-pulse"></div>
-                                                <div className="h-3 w-24 bg-slate-800/30 rounded animate-pulse"></div>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                                            {[...Array(3)].map((_, i) => (
-                                                <div key={i} className="h-32 bg-slate-800/30 rounded-2xl animate-pulse"></div>
-                                            ))}
-                                        </div>
-                                        <div className="space-y-4">
-                                            <div className="h-4 w-full bg-slate-800/30 rounded animate-pulse"></div>
-                                            <div className="h-4 w-5/6 bg-slate-800/30 rounded animate-pulse"></div>
-                                            <div className="h-4 w-4/6 bg-slate-800/30 rounded animate-pulse"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            }>
-                                {screen === 'VALIDATOR' && (
-                                    <ValidatorApp
-                                        onSave={saveToArchive}
-                                        data={activeReport}
-                                        setData={setActiveReport}
-                                        setStatus={setSystemStatus}
-                                    />
-                                )}
-                                {screen === 'VC_ROAST' && <VCRoastApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
-                                {screen === 'PITCH_FORGE' && <PitchForgeApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
-                                {screen === 'BATTLE_ROOM' && <DeltaAnalysisApp archive={archive} setArchive={setArchive} />}
-                            </Suspense>
+                            {screen === 'VALIDATOR' && (
+                                <ValidatorApp
+                                    onSave={saveToArchive}
+                                    data={activeReport}
+                                    setData={setActiveReport}
+                                    setStatus={setSystemStatus}
+                                />
+                            )}
+                            {screen === 'VC_ROAST' && <VCRoastApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
+                            {screen === 'PITCH_FORGE' && <PitchForgeApp onBack={() => setScreen('VALIDATOR')} setStatus={setSystemStatus} />}
+                            {screen === 'WAR_ROOM' && <WarRoomApp onBack={() => setScreen('VALIDATOR')} onSave={saveToArchive} setStatus={setSystemStatus} />}
+                            {screen === 'BATTLE_ROOM' && <DeltaAnalysisApp archive={archive} setArchive={setArchive} />}
                         </motion.div>
                     </AnimatePresence>
                 </div>
@@ -245,12 +179,33 @@ export default function App() {
                     />
                 )}
 
+                <div className="no-print relative mt-auto py-8 md:py-10 w-full flex flex-col items-center transition-opacity z-50">
+                    <div className="flex flex-col items-center gap-4 transition-opacity duration-1000">
+                        <div className="flex items-center gap-4 text-slate-500 font-mono text-[9px] md:text-[10px] uppercase tracking-[0.4em]">
+                            <div className={`w-1 h-1 rounded-full ${systemStatus === 'idle' ? 'bg-amber-500' : 'bg-cyan-500 animate-ping'}`} />
+                            {systemStatus === 'idle' ? 'SYSTEM STANDBY: AWAITING INPUT' : 'ENGINEERED FOR STRATEGIC DOMINANCE'}
+                        </div>
+                        <div className={`flex flex-wrap justify-center gap-x-6 md:gap-x-12 gap-y-2 md:gap-y-4 text-[8px] md:text-[9px] font-black tracking-[0.2em] uppercase transition-colors duration-500 ${systemStatus === 'idle' ? 'text-slate-800' : 'text-slate-600'}`}>
+                            <div className="flex items-center gap-2">
+                                <span>DATA GROUNDING:</span>
+                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-cyan-400'}>{systemStatus === 'idle' ? 'OFFLINE' : 'VERIFIED'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span>NEURAL DEPTH:</span>
+                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-white'}>{systemStatus === 'idle' ? '0-DIM' : '128-DIM'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span>MARKET SYNC:</span>
+                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-emerald-400'}>{systemStatus === 'idle' ? 'IDLE' : 'LIVE'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span>GUARDRAILS:</span>
+                                <span className={systemStatus === 'idle' ? 'text-slate-900' : 'text-purple-400'}>{systemStatus === 'idle' ? 'STANDBY' : 'DEP-7 ACTIVE'}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </main>
-
-            <footer className="no-print relative z-50 w-full border-t border-white/5 py-4 px-6 md:px-8 flex items-center justify-between bg-[#020617]/30 backdrop-blur-sm">
-                <span className="text-slate-500 text-xs font-mono">Brutal startup intelligence, built for founders.</span>
-                <span className="text-slate-600 text-xs font-mono">© {new Date().getFullYear()} Launchmint AI. All rights reserved.</span>
-            </footer>
         </div>
     );
 }

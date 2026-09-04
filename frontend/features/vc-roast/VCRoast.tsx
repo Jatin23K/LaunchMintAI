@@ -1,26 +1,14 @@
-import React, { useState, useRef } from 'react';
-import api from '../../services/api';
-import { ChevronRight, ArrowLeft, AlertTriangle, Skull, Flame } from 'lucide-react';
+import React, { useState } from 'react';
+import axios from 'axios';
+import { 
+    ChevronRight, Loader2, ArrowLeft, AlertTriangle, Skull, Flame 
+} from 'lucide-react';
 import { VCRoastData } from '../../types';
-import { API_BASE_URL } from '../../config';
-
-function getRiskLabel(chance: number): { label: string; color: string; bg: string; border: string } {
-    if (chance <= 15) return { label: 'Critical Risk', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' };
-    if (chance <= 35) return { label: 'High Risk', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' };
-    if (chance <= 55) return { label: 'Moderate Risk', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' };
-    if (chance <= 75) return { label: 'Viable', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' };
-    return { label: 'Strong Potential', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' };
-}
 
 function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 'idle' | 'processing' | 'active') => void }) {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<VCRoastData | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [lastText, setLastText] = useState('');
-    // OPT 5: In-flight deduplication + debounce
-    const inFlightRef = useRef<string | null>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const suggestions = [
         "Creator Economy FinTech",
@@ -30,35 +18,39 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
         "Sustainable AgriTech"
     ];
 
-    const runRoast = async (text: string = lastText || input) => {
+    const runRoast = async (text: string = input) => {
         if (!text) return;
-        // OPT 5: Deduplicate in-flight requests
-        const key = text.trim().toLowerCase();
-        if (inFlightRef.current === key) return;
-        if (loading) return;
-        inFlightRef.current = key;
-
-        setLoading(true); setData(null); setError(null);
-        setLastText(text);
+        setLoading(true); setData(null);
         setStatus('processing');
         try {
-            const response = await api.post(`/vc_roast`, { user_idea: text }, { retry: 2 } as any);
-            setData(response.data);
+            const apiBase = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8000';
+            const response = await axios.post(`${apiBase}/vc_roast`, { user_idea: text });
+            const roastData = response.data;
+
+            // Fetch real calibrated XGBoost ML Survival Prediction & SHAP drivers
+            try {
+                const mlRes = await axios.post(`${apiBase}/predict_survival`, {
+                    macro_vertical: "SaaS & Enterprise",
+                    founder_team_size: 2,
+                    is_tier_1_hub: 1,
+                    competitor_cohort_density: 1200
+                });
+                if (mlRes.data && mlRes.data.status === 'success') {
+                    roastData.survival_chance = Math.round(mlRes.data.survival_probability * 100);
+                    (roastData as any).risk_tier = mlRes.data.risk_tier;
+                    (roastData as any).shap_drivers = mlRes.data.shap_drivers;
+                }
+            } catch (mlErr) {
+                console.warn("ML survival inference fallback:", mlErr);
+            }
+
+            setData(roastData);
             setStatus('active');
         } catch (err) {
             console.error(err);
-            setError('Roast failed. The servers chickened out. Try again.');
             setStatus('idle');
-        } finally {
-            setLoading(false);
-            inFlightRef.current = null; // OPT 5: Clear in-flight marker
         }
-    };
-
-    // OPT 5: Debounced click handler
-    const handleRoastClick = (text?: string) => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => runRoast(text), 300);
+        finally { setLoading(false); }
     };
 
     return (
@@ -82,9 +74,9 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
                                     onChange={e => setInput(e.target.value)}
                                     placeholder="Pitch us your idea (if you dare)..."
                                     className="flex-1 bg-transparent text-white placeholder-gray-500 text-base outline-none h-10"
-                                    onKeyDown={e => e.key === 'Enter' && handleRoastClick()}
+                                    onKeyDown={e => e.key === 'Enter' && runRoast()}
                                 />
-                                <button onClick={() => handleRoastClick()} className="bg-red-600 hover:bg-red-500 text-white px-6 h-10 rounded-full font-bold text-xs tracking-wide transition-transform active:scale-95 flex items-center gap-2">
+                                <button onClick={() => runRoast()} className="bg-red-600 hover:bg-red-500 text-white px-6 h-10 rounded-full font-bold text-xs tracking-wide transition-transform active:scale-95 flex items-center gap-2">
                                     ROAST IT <ChevronRight className="w-4 h-4" />
                                 </button>
                             </div>
@@ -92,14 +84,14 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
                         <div className="flex flex-col gap-3 items-center w-full">
                             <div className="flex flex-nowrap justify-center gap-3 w-full">
                                 {suggestions.slice(0, 3).map((s) => (
-                                    <button key={s} onClick={() => { setInput(s); handleRoastClick(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
+                                    <button key={s} onClick={() => { setInput(s); runRoast(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
                                         {s}
                                     </button>
                                 ))}
                             </div>
                             <div className="flex flex-nowrap justify-center gap-3 w-full">
                                 {suggestions.slice(3, 5).map((s) => (
-                                    <button key={s} onClick={() => { setInput(s); handleRoastClick(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
+                                    <button key={s} onClick={() => { setInput(s); runRoast(s); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-xs text-gray-400 hover:text-white transition-all whitespace-nowrap">
                                         {s}
                                     </button>
                                 ))}
@@ -110,69 +102,15 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
             )}
 
             {loading && (
-                <div className="animate-pulse w-full max-w-5xl px-6 pb-20 mt-10">
-                    {/* kill_shot banner skeleton */}
-                    <div className="bg-gradient-to-br from-red-600/40 to-orange-600/40 p-0.5 rounded-3xl mb-12">
-                        <div className="bg-[#050914] rounded-[22px] p-10 text-center space-y-3">
-                            <div className="h-6 bg-slate-800 rounded-full w-3/4 mx-auto"></div>
-                            <div className="h-6 bg-slate-800 rounded-full w-1/2 mx-auto"></div>
-                        </div>
-                    </div>
-
-                    {/* feedback + survival grid skeleton */}
-                    <div className="grid md:grid-cols-3 gap-6 mb-12">
-                        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl md:col-span-2 space-y-4">
-                            <div className="h-3 bg-slate-800 rounded-full w-32 mb-6"></div>
-                            {[...Array(5)].map((_, i) => (
-                                <div key={i} className="flex gap-4 p-4 rounded-xl bg-black/20 border border-slate-800">
-                                    <div className="h-4 w-8 bg-red-900/50 rounded shrink-0"></div>
-                                    <div className="flex-1 space-y-2">
-                                        <div className="h-3 bg-slate-800 rounded-full w-full"></div>
-                                        <div className="h-3 bg-slate-800 rounded-full w-4/5"></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col items-center justify-center gap-4">
-                            <div className="h-3 bg-slate-800 rounded-full w-24"></div>
-                            <div className="h-24 w-32 bg-slate-800 rounded-xl"></div>
-                            <div className="h-5 w-28 bg-slate-800 rounded-full"></div>
-                            <div className="h-3 bg-slate-800 rounded-full w-full"></div>
-                            <div className="h-3 bg-slate-800 rounded-full w-4/5"></div>
-                        </div>
-                    </div>
-
-                    {/* verdict + competitor skeleton */}
-                    <div className="bg-red-950/20 border-2 border-red-500/20 p-10 rounded-[2.5rem] space-y-4">
-                        <div className="h-3 bg-slate-800 rounded-full w-32"></div>
-                        <div className="h-8 bg-slate-800 rounded-full w-48"></div>
-                        <div className="flex gap-3 p-4 rounded-2xl bg-black/40 border border-red-500/10 mt-6">
-                            <div className="h-6 w-6 bg-red-900/50 rounded shrink-0"></div>
-                            <div className="flex-1 space-y-2">
-                                <div className="h-3 bg-slate-800 rounded-full w-32"></div>
-                                <div className="h-3 bg-slate-800 rounded-full w-full"></div>
-                                <div className="h-3 bg-slate-800 rounded-full w-3/4"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {error && !loading && (
-                <div className="flex flex-col items-center gap-3 py-10">
-                    <p className="text-red-400 text-sm font-bold">{error}</p>
-                    <button
-                        onClick={() => runRoast()}
-                        className="text-red-400 hover:text-red-300 text-sm font-black tracking-wide border border-red-500/30 px-4 py-1.5 rounded-full hover:border-red-400/60 transition-all"
-                    >
-                        ↻ Retry Roast
-                    </button>
+                <div className="flex flex-col items-center justify-center py-20">
+                    <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+                    <div className="text-red-500 font-bold mt-4 tracking-widest animate-pulse">ANALYZING FLAWS...</div>
                 </div>
             )}
 
             {data && (
                 <div className="animate-in slide-in-from-bottom-20 fade-in duration-700 w-full max-w-5xl px-6 pb-20 mt-10">
-                    <button onClick={() => { setData(null); setError(null); setLastText(''); setStatus('idle'); }} className="mb-8 flex items-center gap-2 text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4" /> New Roast</button>
+                    <button onClick={() => { setData(null); setStatus('idle'); }} className="mb-8 flex items-center gap-2 text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4" /> New Roast</button>
                     <div className="bg-gradient-to-br from-red-600 to-orange-600 p-0.5 rounded-3xl mb-12 shadow-[0_0_60px_rgba(220,38,38,0.2)]">
                         <div className="bg-[#050914] rounded-[22px] p-10 text-center relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-pulse"></div>
@@ -186,20 +124,29 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
                             <div className="space-y-4">
                                 {data.brutal_feedback.map((point, i) => (
                                     <div key={i} className="flex gap-4 p-4 rounded-xl bg-black/20 border border-slate-800">
-                                        <span className="text-red-500 font-black shrink-0">#{String(i + 1).padStart(2, '0')}</span>
+                                        <span className="text-red-500 font-black">#0{i+1}</span>
                                         <p className="text-slate-300">{point}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Survival Probability</div>
-                            <div className={`text-8xl font-black tracking-tighter mb-4 ${getRiskLabel(data.survival_chance).color}`}>{data.survival_chance}%</div>
-                            <div className={`px-4 py-1 rounded-full ${getRiskLabel(data.survival_chance).bg} border ${getRiskLabel(data.survival_chance).border} ${getRiskLabel(data.survival_chance).color} text-[10px] font-black uppercase mb-3`}>
-                                {getRiskLabel(data.survival_chance).label}
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Empirical Survival Score</div>
+                            <div className="text-[10px] font-mono text-emerald-400 mb-3">XGBoost ML · 189k Cohort</div>
+                            <div className="text-7xl font-black text-red-500 tracking-tighter mb-3">{data.survival_chance}%</div>
+                            <div className="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-black uppercase mb-3">
+                                {(data as any).risk_tier || "Critical Risk"}
                             </div>
-                            {data.survival_benchmark && (
-                                <p className="text-slate-500 text-[10px] leading-relaxed">{data.survival_benchmark}</p>
+                            {(data as any).shap_drivers && (
+                                <div className="w-full text-left mt-2 pt-2 border-t border-slate-800 text-[10px] space-y-1">
+                                    <p className="text-slate-500 font-bold uppercase text-[9px]">Top SHAP Drivers:</p>
+                                    {(data as any).shap_drivers.positive_factors?.slice(0, 1).map((f: string, idx: number) => (
+                                        <p key={idx} className="text-emerald-400 truncate font-mono text-[9px]">{f}</p>
+                                    ))}
+                                    {(data as any).shap_drivers.risk_factors?.slice(0, 1).map((f: string, idx: number) => (
+                                        <p key={idx} className="text-red-400 truncate font-mono text-[9px]">{f}</p>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     </div>

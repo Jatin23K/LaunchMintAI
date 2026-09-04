@@ -1,65 +1,60 @@
 @echo off
-title LaunchMint AI - Starting...
-color 0A
+title LaunchMint AI - Tactical Deployment Console
+color 0B
 setlocal enabledelayedexpansion
 
+:: --- CONSTANTS ---
 set BACKEND_DIR=%~dp0backend
 set FRONTEND_DIR=%~dp0frontend
-set APP_URL=http://localhost:3000
+set BROWSER_URL=http://127.0.0.1:3000
 
 echo.
-echo  ================================================================
-echo    LAUNCHMINT AI  ^|  STARTING UP
-echo  ================================================================
+echo ======================================================================
+echo    LAUNCHMINT AI: INITIALIZING HIGH-OCTANE INTELLIGENCE SYSTEMS...
+echo ======================================================================
 echo.
 
-:: Check .env files
+:: 1. PREREQUISITE CHECK
+echo [+] Checking environment integrity...
+
 if not exist "%BACKEND_DIR%\.env" (
-    echo  [!] WARNING: backend\.env missing - API keys may not be set.
+    echo [!] WARNING: Backend .env file missing. API keys may be unconfigured.
 )
 if not exist "%FRONTEND_DIR%\.env" (
-    echo  [!] WARNING: frontend\.env missing - VITE_API_BASE_URL may be missing.
+    echo [!] WARNING: Frontend .env file missing. VITE_API_BASE_URL may be missing.
 )
 
-:: Kill any leftover processes on ports 8000 and 5173
-echo  [1/3] Clearing ports 8000 and 5173...
-for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| find "LISTENING" ^| find ":8000"') do taskkill /PID %%a /F >nul 2>&1
-for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| find "LISTENING" ^| find ":3000"') do taskkill /PID %%a /F >nul 2>&1
-timeout /t 1 /nobreak >nul
+:: 2. DEPLOY BACKEND
+echo [+] Deploying Backend Reflex Engine (Port 8000)...
+start "LaunchMint Backend" cmd /c "cd /d %BACKEND_DIR% && .\venv\Scripts\activate && python -m app.main"
 
-:: Start backend
-echo  [2/3] Starting Backend (Port 8000)...
-start "LaunchMint-Backend" cmd /k "cd /d %BACKEND_DIR% && .\venv\Scripts\activate && python -m app.main"
+:: 3. DEPLOY FRONTEND
+echo [+] Initializing Stealth Terminal Interface (Port 3000)...
+start "LaunchMint Frontend" cmd /c "cd /d %FRONTEND_DIR% && npm run dev"
 
-:: Wait 3s for backend to boot before starting frontend
-timeout /t 3 /nobreak >nul
-
-:: Start frontend
-echo  [3/3] Starting Frontend (Port 5173)...
-start "LaunchMint-Frontend" cmd /k "cd /d %FRONTEND_DIR% && npm run dev"
-
-:: Wait for frontend port to be ready
 echo.
-echo  Waiting for app to be ready
+echo [!] Waiting for Tactical Grid to stabilize...
+echo.
+
+:: 4. WAIT FOR FRONTEND PORT
+set "DOTS=."
 :WAIT_LOOP
-netstat -ano 2>nul | find "LISTENING" | find ":3000" >nul
+netstat -ano | find "LISTENING" | find ":3000" > nul
 if errorlevel 1 (
-    set /p=. <nul
-    timeout /t 1 /nobreak >nul
+    set /p="!DOTS!" <nul
+    timeout /t 1 /nobreak > nul
     goto WAIT_LOOP
 )
 
 echo.
 echo.
-echo  ================================================================
-echo    LAUNCHMINT AI IS LIVE  ^|  %APP_URL%
-echo  ================================================================
+echo [!] SYSTEMS ONLINE. Strategic Dominance Engaged.
+echo [!] Launching Mission Control at %BROWSER_URL%...
 echo.
 
-:: Open browser
-start "" "%APP_URL%"
+:: 5. LAUNCH BROWSER
+start "" "%BROWSER_URL%"
 
-echo  Both windows are running in separate terminals.
-echo  Close those terminals to stop the app.
+echo [!] Deployment Complete. Keep this console open to monitor heartbeats.
 echo.
 pause

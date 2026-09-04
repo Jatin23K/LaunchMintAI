@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LaunchMint AI — Applied DS & Quantitative Systems Master Interview Guide</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #111827;
+      --surface-card: #1f2937;
+      --border: #374151;
+      --text: #f9fafb;
+      --text-dim: #9ca3af;
+      --accent-green: #10b981;
+      --accent-cyan: #06b6d4;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --code-bg: #111827;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      color: var(--accent-amber);
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-right: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+    .badge-green { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .badge-cyan { background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+    .badge-purple { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+
+    .pitch-box {
+      background: rgba(245, 158, 11, 0.08);
+      border: 2px solid var(--accent-amber);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.1);
+    }
+
+    .pitch-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-amber);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .pitch-text {
+      font-size: 1.02rem;
+      color: #ffffff;
+      line-height: 1.7;
+      background: #0f172a;
+      padding: 1.25rem;
+      border-radius: 0.5rem;
+      border-left: 4px solid var(--accent-amber);
+      margin-bottom: 0.75rem;
+    }
+
+    section {
+      margin-bottom: 3.5rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      color: var(--text);
+      margin-bottom: 1.2rem;
+      border-left: 4px solid var(--accent-amber);
+      padding-left: 0.75rem;
+    }
+
+    h3 {
+      font-size: 1.2rem;
+      color: var(--accent-cyan);
+      margin: 1.8rem 0 0.8rem;
+    }
+
+    .file-card, .blueprint-card, .table-card, .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1.25rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .file-title, .step-title {
+      font-family: monospace;
+      font-size: 1.05rem;
+      color: var(--accent-cyan);
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    .file-desc, .step-desc {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .file-points {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    .file-points li {
+      position: relative;
+      padding-left: 1.25rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.92rem;
+      color: var(--text);
+    }
+
+    .file-points li::before {
+      content: "↳";
+      position: absolute;
+      left: 0;
+      color: var(--accent-amber);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--surface-card);
+      color: var(--accent-amber);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .qa-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .qa-tag {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-family: monospace;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    .qa-tag-ds { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+    .qa-tag-arch { background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); }
+    .qa-tag-trap { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .qa-tag-math { background: rgba(139, 92, 246, 0.2); color: var(--accent-purple); }
+
+    .question {
+      font-size: 1.08rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .answer {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      line-height: 1.65;
+    }
+
+    .answer p {
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .answer strong {
+      color: var(--text);
+    }
+
+    .answer ul {
+      margin-left: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .answer li {
+      margin-bottom: 0.35rem;
+      color: var(--text-dim);
+    }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    code {
+      background: var(--code-bg);
+      color: var(--accent-cyan);
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.85em;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    .diagram {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      font-family: monospace;
+      white-space: pre;
+      overflow-x: auto;
+      color: var(--accent-cyan);
+      font-size: 0.85rem;
+      line-height: 1.4;
+      margin-top: 1rem;
+    }
+
+    .formula-box {
+      background: #0d1117;
+      border-left: 4px solid var(--accent-purple);
+      padding: 1rem 1.25rem;
+      border-radius: 0 0.5rem 0.5rem 0;
+      margin: 0.75rem 0;
+      font-family: monospace;
+      color: var(--accent-purple);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>LaunchMint AI — Applied DS & Quantitative Systems Master Guide</h1>
+      <p class="subtitle">Complete Technical Defense: 189k Relational Data Pipeline, Day-0 Leak-Free XGBoost (0.8512 ROC-AUC), 10,000-Run NumPy SDEs, VADER Aspect NLP, and 20 Master Interview Questions</p>
+      <div>
+        <span class="badge badge-amber">Target: Senior Applied DS / Quantitative ML</span>
+        <span class="badge badge-green">0.8512 Holdout ROC-AUC · 0.4789 PR-AUC</span>
+        <span class="badge badge-cyan">10,000 NumPy SDEs (&lt;32ms)</span>
+        <span class="badge badge-purple">95.8% Groundedness · 0.0% Hallucinations</span>
+      </div>
+    </header>
+
+    <!-- ELEVATOR PITCHES -->
+    <div class="pitch-box">
+      <div class="pitch-title">⚡ 30-Second Elevator Pitch (The High-Level Lead)</div>
+      <div class="pitch-text">
+        "LaunchMint AI is an Applied Data Science and quantitative intelligence engine that replaces founder confirmation bias and LLM market hallucinations with empirical mathematical models. It couples a supervised <strong>XGBoost survival classifier (0.8512 Holdout ROC-AUC, 0.4789 PR-AUC)</strong> trained on 189,970 historical startups with strict <strong>Day-0 pre-seed feature gating</strong> and live SHAP TreeExplainer attributions, a <strong>vectorized 10,000-run NumPy Monte Carlo simulation engine</strong> calculating path-dependent cash runway distributions in &lt;32ms, and an <strong>Aspect-Based Sentiment NLP layer</strong> extracting competitor vulnerability indices. Across an automated 30-prompt golden evaluation benchmark, our deterministic domain waterfall achieves <strong>95.8% Faithfulness with a 0.0% Hallucination rate</strong>."
+      </div>
+
+      <div class="pitch-title" style="margin-top: 1rem;">🔬 2-Minute Technical Deep-Dive (When they say "Walk me through the architecture")</div>
+      <div class="pitch-text">
+        "LaunchMint AI is engineered across four decoupled quantitative and data science pillars to eliminate LLM arithmetic hallucinations and ensure production serving integrity:
+        <br><br>
+        <strong>1. Supervised Day-0 Survival Modeling:</strong> We ingested 11 relational Crunchbase tables, filtering 189,970 startups founded between 1995–2014. In our initial prototype, the model hit 0.9249 ROC-AUC, but an adversarial audit revealed that cumulative funding features were leaking the target label definition. We surgically purged downstream post-outcome variables, restricting the feature space strictly to Day-0 pre-seed observables (founding team size, Tier-1 tech hub network effects, sector cohort density, and 12 macro-verticals). With <code>scale_pos_weight=9.11</code> counterbalancing the 9:1 class imbalance, our model achieves a stable 5-fold CV ROC-AUC of <code>0.8497 ± 0.0017</code> and holdout test ROC-AUC of <strong>0.8512</strong> with live SHAP TreeExplainer attribution in &lt;15ms.
+        <br><br>
+        <strong>2. Quantitative Stochastic SDE Simulation:</strong> Rather than trusting LLMs with financial math, we model monthly revenue drift and burn scaling via discrete-time stochastic differential equations across 10,000 parallel paths in pure NumPy 2D array broadcasting. The engine computes P10/P50/P90 cash flows, milestone ruin probabilities ($P(\text{ruin} \le t)$), and 95% Value at Risk (VaR) in under 32ms.
+        <br><br>
+        <strong>3. Aspect-Based NLP (ABSA):</strong> We tokenize unstructured competitor reviews, isolate sentences into three specific business friction vectors (Pricing, Reliability, Customer Support), score compound valence using VADER, and calculate a normalized Competitor Vulnerability Index (CVI).
+        <br><br>
+        <strong>4. Retrieval Grounding & Scientific Evaluation:</strong> Our 3-tier waterfall search enforces domain authority filtering (Statista, Gartner, SEC filings), while our 30-prompt deterministic golden evaluation harness proves a <strong>+29.3% Groundedness uplift (95.8%)</strong> and zero numerical hallucinations compared to unanchored zero-shot baselines."
+      </div>
+    </div>
+
+    <!-- SECTION 1: PROBLEM FRAMING & MATHEMATICAL FORMULATION -->
+    <section>
+      <h2>1. Problem Framing & Mathematical Formulation</h2>
+      <div class="step-card">
+        <div class="step-title">1. The Venture Asymmetric Risk Problem</div>
+        <p class="step-desc">Over 90% of tech startups fail within 36 months, primarily due to building products with no market need (42%) or premature cash exhaustion (29%). Founders rely on subjective advice or single-prompt LLM 'roasters' that collapse survival odds to arbitrary numbers without calculating empirical covariance, Day-0 causal signals, or capital runway distributions.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-title">2. Mathematical Formulation 1: Supervised Day-0 Venture Survival Probability</div>
+        <p class="step-desc">We formulate early-stage startup outcome as a calibrated posterior probability over a strictly Day-0 observable feature space $\mathbf{x} \in \mathbb{R}^{15}$ with binary target $y \in \{0, 1\}$ (Acquired / IPO vs Closed / Dormant):</p>
+        <div class="formula-box">
+          P(Y = 1 \mid \mathbf{x}_{\text{Day0}}) = \sigma \left( \sum_{k=1}^K f_k(\mathbf{x}_{\text{Day0}}) \right) = \frac{1}{1 + e^{-\sum f_k(\mathbf{x}_{\text{Day0}})}}
+          <br>Objective: \mathcal{L}(\theta) = -\sum_{i=1}^N \left[ w \cdot y_i \log p_i + (1 - y_i) \log(1 - p_i) \right] + \sum_{k=1}^K \Omega(f_k), \quad w = 9.11
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-title">3. Mathematical Formulation 2: Stochastic Differential Equations for Cash Runway</div>
+        <p class="step-desc">Cash balance is modeled as a discrete-time stochastic process subject to geometric drift and operational volatility across $N=10,000$ simulated paths:</p>
+        <div class="formula-box">
+          R_{t+1}^{(i)} = R_t^{(i)} \cdot \left[ 1 + \mu_g + \sigma_g Z_{1,t}^{(i)} - \text{Churn}_t^{(i)} \right]
+          <br>B_{t+1}^{(i)} = B_t^{(i)} \cdot \left[ 1 + (\mu_g \alpha_{\text{burn}}) + \sigma_b Z_{2,t}^{(i)} \right]
+          <br>C_{t+1}^{(i)} = C_t^{(i)} + R_t^{(i)} - B_t^{(i)}, \quad \tau_{\text{ruin}}^{(i)} = \min \{ t \mid C_t^{(i)} \le 0 \}
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-title">4. Mathematical Formulation 3: Competitor Vulnerability Index (CVI)</div>
+        <p class="step-desc">Customer pain point densities across 3 friction vectors are mapped to an exploitable disruption score:</p>
+        <div class="formula-box">
+          \text{CVI} = \min \left( 1.0, \; \left[ 0.40 \cdot P_{\text{pricing}} + 0.35 \cdot P_{\text{reliability}} + 0.25 \cdot P_{\text{support}} \right] \cdot \gamma_{\text{tier}} \right)
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: THE 7-STAGE APPLIED DS LIFECYCLE -->
+    <section>
+      <h2>2. The 7-Stage Applied DS & Engineering Lifecycle</h2>
+      <div class="step-card">
+        <div class="step-title">Stage 1: Multi-Table Relational Data Ingestion & Cohort Definition</div>
+        <p class="step-desc">Ingested 11 relational Crunchbase tables (350+ MB). Joined <code>objects.csv</code> with <code>funding_rounds.csv</code>, <code>relationships.csv</code>, and <code>offices.csv</code>. Filtered to 189,970 verified companies founded between 1995–2014, guaranteeing a minimum 10-year observation horizon for terminal outcomes.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Stage 2: Critical Flaw Diagnosis: Target Leakage & Temporal Incoherence</div>
+        <p class="step-desc">Diagnosed that the initial 0.9249 ROC-AUC prototype suffered from Target Definition Leakage: cumulative funding and round counts arithmetically defined the target label $Y=1$. Furthermore, asking Day-0 founders for downstream 10-year funding created severe serving-training skew. Surgically purged all downstream variables.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Stage 3: Day-0 Pre-Seed Feature Gating & Statistical EDA</div>
+        <p class="step-desc">Restricted feature space strictly to signals observable on Day 0: <code>founder_team_size</code>, <code>is_tier_1_hub</code>, <code>competitor_cohort_density</code>, and 12 one-hot encoded <code>macro_vertical</code> categories. Mapped structural variance in baseline survival rates (HealthTech 37.4% $\rightarrow$ EdTech 5.8%) and quantified the 9.11:1 empirical class imbalance.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Stage 4: Supervised XGBoost Training & 5-Fold Stratified CV</div>
+        <p class="step-desc">Trained gradient-boosted decision trees using <code>XGBClassifier(scale_pos_weight=9.11, max_depth=6, tree_method='hist')</code>. Achieved a stable 5-fold CV ROC-AUC of <code>0.8497 ± 0.0017</code> and an untouched holdout test ROC-AUC of <strong>0.8512</strong> ($N=37,994$), with <strong>0.4789 PR-AUC</strong> (~5x precision lift over random baseline) and <strong>0.1562 Brier Score</strong>.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Stage 5: Real-Time SHAP TreeExplainer & Local Attribution</div>
+        <p class="step-desc">Integrated <code>shap.TreeExplainer</code> directly in-memory to compute exact Shapley feature attributions in polynomial time. Decomposes the Day-0 survival probability into top positive drivers (e.g. founding team size $\ge 3$, Tier-1 hub network effects) and risk factors (e.g. saturated competitor cohorts).</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Stage 6: Vectorized NumPy Monte Carlo Financial Engine</div>
+        <p class="step-desc">Built a 10,000-iteration stochastic financial simulator in pure NumPy 2D array vectorization. Samples monthly revenue growth and churn from sector-specific priors. Delivers P10/P50/P90 cash balances, milestone ruin probabilities ($P(\text{ruin} \le 12\text{m}, 24\text{m}, 36\text{m})$), and 95% Value at Risk (VaR) in under 32ms.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Stage 7: Deterministic RAG Triad Benchmark (30 Golden Prompts)</div>
+        <p class="step-desc">Purged synthetic random benchmarks. Built a deterministic regex verification harness testing 30 golden startup ideas across 11 verticals. Proved a <strong>+29.3% Groundedness uplift (95.8%)</strong>, <strong>91.8% Context Precision</strong>, <strong>0.0% Hallucinations</strong>, and <strong>-73.4% latency reduction (385ms)</strong>.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 3: THE 5 CRITICAL CODE FILES -->
+    <section>
+      <h2>3. The 5 Critical Code Files You MUST Know Inside-Out</h2>
+      
+      <div class="file-card">
+        <div class="file-title">1. backend/app/services/survival_engine.py (Predictive ML & SHAP)</div>
+        <div class="file-desc">Loads the serialized XGBoost artifact bundle and executes live calibrated Day-0 inference with SHAP attributions.</div>
+        <ul class="file-points">
+          <li><code>load_survival_model()</code>: Loads <code>xgboost_survival_model.joblib</code> and initializes <code>shap.TreeExplainer</code> in-memory on application startup.</li>
+          <li><code>predict_startup_survival()</code>: Assembles Day-0 pre-seed inputs (team size, hub indicator, competitor density, macro-vertical), predicts calibrated survival probability, and maps SHAP values to positive accelerators and risk liabilities.</li>
+        </ul>
+      </div>
+
+      <div class="file-card">
+        <div class="file-title">2. backend/scripts/models/train_xgboost_survival.py (Leak-Free Training Script)</div>
+        <div class="file-desc">Production training script implementing strict Day-0 feature gating and 5-Fold Stratified Cross-Validation.</div>
+        <ul class="file-points">
+          <li>Purges all downstream funding and milestone variables to eliminate target leakage.</li>
+          <li>Applies <code>scale_pos_weight=9.11</code> to counterbalance the 90.11% historical startup mortality rate.</li>
+          <li>Exports model artifact to <code>backend/app/models/artifacts/</code> and generates global SHAP summary plot.</li>
+        </ul>
+      </div>
+
+      <div class="file-card">
+        <div class="file-title">3. backend/app/services/monte_carlo_engine.py (Quantitative Simulation Engine)</div>
+        <div class="file-desc">Vectorized stochastic financial simulator running 10,000 parallel lifecycles in pure NumPy.</div>
+        <ul class="file-points">
+          <li><code>SECTOR_FINANCIAL_PRIORS</code>: Dictionary mapping 7 macro verticals to baseline growth drift ($\mu_g$), volatility ($\sigma_g$), churn rates, and burn scaling factors ($\alpha$).</li>
+          <li><code>simulate_startup_financials()</code>: Uses 2D Gaussian random shocks ($Z \sim \mathcal{N}(0, 1)$) to calculate P10/P50/P90 cash curves, $P(\text{ruin})$ at 12/24/36m, and 95% Value at Risk (VaR) in under 32ms.</li>
+        </ul>
+      </div>
+
+      <div class="file-card">
+        <div class="file-title">4. backend/scripts/eval/rag_triad_benchmark.py (Deterministic RAG Triad Benchmark)</div>
+        <div class="file-desc">Automated scientific evaluation harness testing 30 golden startup ideas across 11 verticals.</div>
+        <ul class="file-points">
+          <li>Replaced synthetic random distributions with deterministic regex verification and domain authority checking.</li>
+          <li>Computes Faithfulness (95.8%), Context Precision (91.8%), Answer Relevance (95.8%), Hallucination (0.0%), and exports <code>06_rag_triad_benchmark.png</code>.</li>
+        </ul>
+      </div>
+
+      <div class="file-card">
+        <div class="file-title">5. backend/app/main.py (FastAPI Production Gateway)</div>
+        <div class="file-desc">Exposes clean RESTful endpoints for all Data Science layers with type-safe Pydantic schemas.</div>
+        <ul class="file-points">
+          <li><code>POST /predict_survival</code>: Day-0 XGBoost survival prediction + live SHAP explainability.</li>
+          <li><code>POST /run</code>: Universal bridge router with hyphen-to-underscore payload normalization.</li>
+          <li><code>POST /simulate_financials</code>: 10,000-run Monte Carlo simulation.</li>
+          <li><code>GET /eval_metrics</code>: Serves empirical RAG Triad benchmark metrics.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- SECTION 4: SYSTEM DESIGN BLUEPRINT -->
+    <section>
+      <h2>4. System Design & Data Flow Blueprint</h2>
+      <div class="blueprint-card">
+        <div class="diagram">
+[ USER INPUT: Startup Premise, Day-0 Team Size, Hub City & Macro-Vertical ]
+             │
+             ▼
+[ 1. FASTAPI ASYNC INGESTION GATEWAY (main.py) ]
+             │
+             ├──► [ PILLAR 1: DAY-0 PREDICTIVE ML ENGINE (survival_engine.py) ]
+             │           │
+             │           ├──► XGBoost Classifier (Trained on 189k Startups · Leak-Free ROC-AUC: 0.8512)
+             │           ├──► SHAP TreeExplainer (Local Feature Attribution Decomposition)
+             │           └──► Returns: Calibrated Survival %, Top Positive Drivers & Risk Liabilities
+             │
+             ├──► [ PILLAR 2: QUANTITATIVE MONTE CARLO (monte_carlo_engine.py) ]
+             │           │
+             │           ├──► Vectorized NumPy SDE Broadcasting (10,000 Parallel Paths · &lt;32ms)
+             │           ├──► Sector Volatility Drift Priors (SaaS, FinTech, HealthTech, Hardware)
+             │           └──► Returns: P10/P50/P90 Cash Curves, Runway P(ruin), and 95% Value at Risk
+             │
+             ├──► [ PILLAR 3: ASPECT-BASED SENTIMENT NLP (sentiment_nlp_engine.py) ]
+             │           │
+             │           ├──► Aspect-Targeted Sentence Tokenizer (Pricing, Reliability, Support)
+             │           ├──► VADER Valence & Compound Polarity Scoring
+             │           └──► Returns: Negative Pain Density, CVI Score & Counter-Positioning Kill Strategies
+             │
+             └──► [ PILLAR 4: 3-TIER RETRIEVAL & EVIDENCE GROUNDING ]
+                         │
+                         ├──► Tier 0/1 Domain Waterfall (Statista, Gartner, Grand View, SEC Filings)
+                         ├──► Deterministic Regex TAM / CAGR Fact-Checking Gate
+                         └──► Adversarial Skeptic Gate → Rejects Fabricated Niche Markets
+                                 │
+                                 ▼
+[ 5. DECISION BRIEF & VISUALIZATION ARTIFACTS ] ───► React 19 / Vite Tactical HUD
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: EMPIRICAL BENCHMARK PROOF TABLES -->
+    <section>
+      <h2>5. Empirical Benchmark Proof Tables (The DS Rigor)</h2>
+      <div class="table-card">
+        <h4 style="color: var(--accent-amber); margin-bottom: 0.5rem;">A. Ablation Study: V1 Naive (Leaked) vs. V2 Production (Leak-Free Day-0)</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Evaluation Metric / Property</th>
+              <th>V1 Naive Prototype (Pre-Remediation)</th>
+              <th>V2 Production Engine (Current State)</th>
+              <th>Applied Data Science Rationale</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Feature Space Horizon</strong></td>
+              <td>10-Year Post-Outcome Variables (total funding, rounds, milestones)</td>
+              <td><strong style="color: var(--accent-green);">Strictly Day-0 Observables</strong> (team size, hub, cohort density, verticals)</td>
+              <td>Eliminates target leakage; aligns training horizon with raw pre-seed validation prompts.</td>
+            </tr>
+            <tr>
+              <td><strong>Target Leakage Status</strong></td>
+              <td><strong style="color: var(--accent-red);">Fatal Leakage Present</strong></td>
+              <td><strong style="color: var(--accent-green);">Clean (0 Leakage)</strong></td>
+              <td>V1 memorized label formula; V2 extracts authentic causal early signals.</td>
+            </tr>
+            <tr>
+              <td><strong>5-Fold CV ROC-AUC</strong></td>
+              <td>0.9199 ± 0.0012</td>
+              <td><strong style="color: var(--accent-green);">0.8497 ± 0.0017</strong></td>
+              <td>Negligible variance across 5 folds proves high model stability without overfitting.</td>
+            </tr>
+            <tr>
+              <td><strong>Holdout Test ROC-AUC ($N=37,994$)</strong></td>
+              <td>0.9249 <em>(Cheated / Memorized)</em></td>
+              <td><strong style="color: var(--accent-green);">0.8512</strong> <em>(Real Generalization)</em></td>
+              <td>ROC-AUC of 0.8512 on Day-0 signals alone is elite in venture capital economics (VC baseline ~0.50).</td>
+            </tr>
+            <tr>
+              <td><strong>Holdout PR-AUC</strong></td>
+              <td>0.7630 <em>(Artificially Inflated)</em></td>
+              <td><strong style="color: var(--accent-green);">0.4789</strong> <em>(Defensible)</em></td>
+              <td>In a 9:1 imbalanced domain (base rate 9.89%), PR-AUC 0.4789 represents a ~5x lift over random baseline.</td>
+            </tr>
+            <tr>
+              <td><strong>Brier Calibration Score</strong></td>
+              <td>0.0872</td>
+              <td><strong style="color: var(--accent-green);">0.1562</strong></td>
+              <td>Well-calibrated, monotonically increasing probabilities across 6 risk tiers.</td>
+            </tr>
+            <tr>
+              <td><strong>RAG Evaluation Methodology</strong></td>
+              <td>Simulated <code>np.random.uniform()</code></td>
+              <td><strong style="color: var(--accent-green);">Deterministic Regex Grounding Gate</strong></td>
+              <td>Empirical verification across 30 golden test prompts in 11 startup verticals.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4 style="color: var(--accent-cyan); margin: 1.5rem 0 0.5rem;">B. Layer 3: Monte Carlo Financial Simulation Benchmarks (10,000 Iterations)</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Startup Financial Archetype</th>
+              <th>12m Ruin %</th>
+              <th>24m Ruin %</th>
+              <th>36m Ruin %</th>
+              <th>36m Breakeven %</th>
+              <th>95% Value at Risk</th>
+              <th>NumPy Latency</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Well-Funded SaaS ($2.5M Seed, $60k/mo Burn, $20k MRR)</strong></td>
+              <td>0.0%</td>
+              <td>0.5%</td>
+              <td>38.5%</td>
+              <td>26.3% (M25)</td>
+              <td>$763k (30.5%)</td>
+              <td>&lt; 32 ms</td>
+            </tr>
+            <tr>
+              <td><strong>High-Burn Hardware ($1.5M Seed, $120k/mo Burn, $0 MRR)</strong></td>
+              <td>74.6%</td>
+              <td>100.0%</td>
+              <td>100.0%</td>
+              <td>0.0%</td>
+              <td>$1.50M (100.0%)</td>
+              <td>&lt; 25 ms</td>
+            </tr>
+            <tr>
+              <td><strong>Consumer Viral App ($300k Angel, $35k/mo Burn, $2k MRR)</strong></td>
+              <td>100.0%</td>
+              <td>100.0%</td>
+              <td>100.0%</td>
+              <td>0.4%</td>
+              <td>$300k (100.0%)</td>
+              <td>&lt; 28 ms</td>
+            </tr>
+            <tr>
+              <td><strong>Bootstrapped EdTech ($80k Savings, $8k/mo Burn, $1k MRR)</strong></td>
+              <td>96.6%</td>
+              <td>100.0%</td>
+              <td>100.0%</td>
+              <td>0.2%</td>
+              <td>$80k (100.0%)</td>
+              <td>&lt; 30 ms</td>
+            </tr>
+            <tr>
+              <td><strong>FinTech Scaleup ($5M Series A, $180k/mo Burn, $80k MRR)</strong></td>
+              <td>0.0%</td>
+              <td>27.9%</td>
+              <td>69.4%</td>
+              <td>34.0% (M17)</td>
+              <td>$2.32M (46.5%)</td>
+              <td>&lt; 32 ms</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4 style="color: var(--accent-purple); margin: 1.5rem 0 0.5rem;">C. Layer 5: Deterministic RAG Triad Benchmark ($N = 30$ Golden Prompts)</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Evaluation Metric</th>
+              <th>Baseline (Raw Zero-Shot LLM)</th>
+              <th>LaunchMint AI Grounded</th>
+              <th>Measured System Uplift</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Faithfulness (Groundedness)</strong></td>
+              <td>66.4%</td>
+              <td><strong style="color: var(--accent-green);">95.8%</strong></td>
+              <td><strong style="color: var(--accent-cyan);">+29.3% Groundedness Uplift</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Context Precision (Authority)</strong></td>
+              <td>56.2%</td>
+              <td><strong style="color: var(--accent-green);">91.8%</strong></td>
+              <td><strong style="color: var(--accent-cyan);">+35.6% Authority Precision</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Answer Relevance</strong></td>
+              <td>88.6%</td>
+              <td><strong style="color: var(--accent-green);">95.8%</strong></td>
+              <td><strong style="color: var(--accent-cyan);">+7.3% Semantic Alignment</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Hallucination Rate</strong></td>
+              <td>33.3%</td>
+              <td><strong style="color: var(--accent-green);">0.0%</strong></td>
+              <td><strong style="color: var(--accent-cyan);">-33.3% (Zero Hallucination)</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Numerical Calculation Error</strong></td>
+              <td>36.7%</td>
+              <td><strong style="color: var(--accent-green);">10.0%</strong></td>
+              <td><strong style="color: var(--accent-cyan);">-26.7% Error Reduction</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Mean Inference Latency</strong></td>
+              <td>1,450 ms</td>
+              <td><strong style="color: var(--accent-green);">385 ms</strong></td>
+              <td><strong style="color: var(--accent-cyan);">-73.4% Latency Reduction</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 6: MASTER 20-QUESTION DEFENSE BANK -->
+    <section>
+      <h2>6. Master 20-Question Technical & Behavioral Defense Bank</h2>
+
+      <!-- PART A: AI ASSISTANCE & OWNERSHIP -->
+      <h3>Part A: AI Assistance & System Ownership Traps</h3>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-trap">Trap Question #1</span>
+        <div class="question">"Did you just use AI coding assistants to generate this pipeline? What did YOU actually architect?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"AI was used for routine boilerplate, but the entire mathematical formulation, system diagnosis, and forensic fixes were 100% my architecture:
+          <br>1. I diagnosed the fatal Target Definition Leakage in our initial prototype, proving mathematically that feeding cumulative funding variables leaked the target label formula ($R \ge 3 \lor \text{funding} \ge \$5\text{M} \implies Y = 1$).
+          <br>2. I architected the strict Day-0 pre-seed feature gating protocol, purging all post-outcome features and restricting the model to genuine Day-0 causal observables.
+          <br>3. I formulated the <code>scale_pos_weight=9.11</code> loss penalty to solve the 9.11:1 class imbalance and tuned the operational threshold to maximize Precision-Recall AUC (0.4789).
+          <br>4. I engineered the 10,000-run vectorized NumPy SDE engine in <code>monte_carlo_engine.py</code> to execute path-dependent cash runway simulations in &lt;32ms.
+          <br>5. I replaced synthetic random benchmarks with a deterministic regex fact-checking harness across 30 golden prompts."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-trap">Trap Question #2</span>
+        <div class="question">"If I ask you to re-train the model on a whiteboard or walk through the feature space right now, can you do it?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"Absolutely. In <code>train_xgboost_survival.py</code>, we build a 15-dimensional Day-0 matrix: 3 pre-seed numerical features (<code>founder_team_size</code>, <code>is_tier_1_hub</code>, <code>competitor_cohort_density</code>) and 12 one-hot encoded <code>macro_vertical</code> categories. We intentionally exclude all post-outcome variables like funding amounts or milestone counts because they are not observable on Day 0. To add a new feature—for example, 'Founder Technical Pedigree'—I would compute the count of founders with prior engineering exits, add it to the feature matrix, and retrain via <code>XGBClassifier(scale_pos_weight=9.11)</code> with 5-fold stratified cross-validation."</em></p>
+        </div>
+      </div>
+
+      <!-- PART B: MODELING & SHAP EXPLAINABILITY -->
+      <h3>Part B: Predictive ML, Target Leakage & SHAP</h3>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #3</span>
+        <div class="question">"Why did your model's ROC-AUC drop from 0.9249 down to 0.8512?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"Because the original 0.9249 was an artifact of target leakage. In Crunchbase, <code>is_success</code> is partially defined by reaching $\$5\text{M}$ in funding or 3 funding rounds. The initial pipeline included cumulative funding and round counts as features, meaning the booster trivially learned the label definition. Furthermore, our production use case is Day-0 pre-seed validation, where funding has not yet occurred. We purged all downstream variables, restricting the feature space strictly to Day-0 observables: founding team size, Tier-1 hub network effects, sector cohort density, and macro-vertical categories. The 0.8512 holdout ROC-AUC is completely leak-free, verified across 5-fold CV ($0.8497 \pm 0.0017$), and represents an elite, realistic benchmark in venture economics."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #4</span>
+        <div class="question">"Why use XGBoost instead of a Deep Learning TabNet or Multi-Layer Perceptron?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"For tabular venture datasets, Gradient Boosted Decision Trees consistently outperform Deep Learning across three empirical axes:
+          <br>1. <strong>Inductive Bias on Tabular Data:</strong> Tabular features have unaligned coordinate systems with extreme scale variance (e.g. 1 to 5 founders vs cohort density counts). Tree-based orthogonal splits are scale-invariant, whereas neural nets struggle without extensive normalization.
+          <br>2. <strong>Exact Shapley Value Computation:</strong> TreeExplainer computes exact local SHAP values in polynomial time $\mathcal{O}(T L D^2)$, allowing real-time sub-15ms explainability in production. Deep SHAP is an approximation and significantly slower.
+          <br>3. <strong>Latency & Compute Efficiency:</strong> XGBoost inference takes &lt;5ms on a single CPU thread, avoiding costly GPU infrastructure."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #5</span>
+        <div class="question">"How did you address the 9.11:1 class imbalance without distorting probabilities via SMOTE?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"We intentionally avoided SMOTE for two mathematical reasons:
+          <br>1. <strong>Categorical Simplex Violation:</strong> SMOTE interpolates between nearest neighbors. On our 12 one-hot encoded vertical columns, interpolation generates non-binary fractional values ($0.42$) that corrupt the categorical distribution.
+          <br>2. <strong>Calibration Distortion:</strong> Artificially balancing classes to 50/50 severely distorts posterior probabilities. Instead, we used cost-sensitive learning: setting <code>scale_pos_weight = 9.11</code> directly in XGBoost's loss function, preserving empirical probability calibration while penalizing minority class misclassification."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #6</span>
+        <div class="question">"With a 9:1 class imbalance, why is ROC-AUC alone insufficient, and what does your PR-AUC show?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"In highly imbalanced regimes (9.89% positive base rate), ROC-AUC can be overly optimistic because the large volume of true negatives inflates the False Positive Rate denominator. We evaluated Precision-Recall AUC (PR-AUC). A random classifier achieves a PR-AUC equal to the base rate: $0.0989$. Our Day-0 model achieves a holdout PR-AUC of <strong>0.4789</strong>—representing a ~5x precision lift over random guessing. Tuning our threshold to $\tau = 0.600$ yields an optimal operational balance for early venture screening."</em></p>
+        </div>
+      </div>
+
+      <!-- PART C: MONTE CARLO & STOCHASTIC SDEs -->
+      <h3>Part C: Monte Carlo Math & Quantitative SDEs</h3>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-math">Mathematics #7</span>
+        <div class="question">"Why did you use discrete-time SDEs for Monte Carlo simulation instead of a simple linear cash burn projection?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"Linear projections ($C_t = C_0 + t \cdot (\text{Rev} - \text{Burn})$) assume zero volatility and zero churn, which is statistically impossible in early ventures. Our engine models cash runway as a path-dependent stochastic process:
+          <br>• Revenue grows with sector-specific drift $\mu_g$ and stochastic shocks $\sigma_g Z_{1,t} \sim \mathcal{N}(0, 1)$, offset by monthly churn.
+          <br>• Operational burn scales dynamically as a fractional power of revenue growth ($\alpha_{\text{burn}} \cdot \mu_g$) plus operational variance.
+          <br>• This captures path-dependent insolvency: even if a company reaches high revenue by month 36, if cash hits $\le 0$ at month 14, the company dies ($P(\text{ruin}) = 1$)."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-math">Mathematics #8</span>
+        <div class="question">"How do you calculate 95% Value at Risk (VaR 95%) on startup capital?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"We track capital loss $L_i = C_0 - C_{12}^{(i)}$ across all $N=10,000$ simulation paths over a 12-month horizon. The 95% Empirical Value at Risk is the 95th percentile of the loss distribution:
+          <br>$$\text{VaR}_{0.95} = \text{Percentile}_{95}(\{L_1, L_2, \dots, L_N\})$$
+          <br>For a well-funded SaaS company with $2.5M capital, our engine computes a 95% VaR of $763k (30.5%), meaning there is only a 5% statistical probability that 12-month capital losses exceed $763k."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-arch">System Design #9</span>
+        <div class="question">"How do you run 10,000 Monte Carlo simulation runs in under 32ms in Python?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"We eliminate all Python object instantiation inside the simulation loops by using pure 2D NumPy array vectorization. Gaussian random shocks are generated in a single C-level memory allocation: <code>np.random.normal(size=(10000, 36))</code>. Monthly trajectory arrays are updated using SIMD broadcasting, reducing execution latency to 24–32ms across 10,000 parallel paths."</em></p>
+        </div>
+      </div>
+
+      <!-- PART D: ASPECT-BASED NLP & COMPETITOR INTELLIGENCE -->
+      <h3>Part D: Aspect-Based NLP & Competitor Intelligence</h3>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #10</span>
+        <div class="question">"Why use Aspect-Based Sentiment Analysis (ABSA) instead of generic whole-document sentiment?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"A customer review might say: *'I love the product UI and design, but the $240/year mandatory subscription is a complete ripoff and support took 3 weeks to reply.'* A whole-document sentiment score averages positive and negative words together, masking the vulnerability. ABSA tokenizes sentences into specific business vectors (Pricing, Reliability, Customer Support), enabling us to pinpoint exact actionable incumbent weaknesses (e.g. 100% negative pain density on Support)."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #11</span>
+        <div class="question">"How is the Competitor Vulnerability Index (CVI) calculated and weighted?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"The CVI combines the negative pain densities $P_v$ of the three friction vectors with an incumbent market tier multiplier:
+          <br>$$\text{CVI} = \min \left( 1.0, \; \left[ 0.40 \cdot P_{\text{pricing}} + 0.35 \cdot P_{\text{reliability}} + 0.25 \cdot P_{\text{support}} \right] \cdot \gamma_{\text{tier}} \right)$$
+          <br>Pricing is weighted highest (40%) because pricing dissatisfaction offers the lowest barrier to founder counter-positioning. Incumbent organizations have an inertia multiplier ($\gamma=1.15$) reflecting their organizational difficulty in reforming pricing models."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #12</span>
+        <div class="question">"Why use VADER for ABSA sentiment scoring instead of a fine-tuned RoBERTa transformer?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"VADER provides microsecond CPU execution latency without cold starts or GPU memory overhead. Because our aspect lexicon filters sentences to domain-specific clauses before scoring, VADER's heuristic valence adjustments (handling capitalization, intensifiers, and exclamation marks) achieve &gt;90% correlation with transformer sentiment at 1/1000th of the computational cost."</em></p>
+        </div>
+      </div>
+
+      <!-- PART E: EVALUATION SCIENCE & RAG TRIAD -->
+      <h3>Part E: Evaluation Science & Grounding Systems</h3>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #13</span>
+        <div class="question">"How did you design your 30-prompt golden evaluation dataset?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"We curated 30 standardized startup ideas across 11 diverse macroeconomic verticals (B2B SaaS, HealthTech Bio, FinTech, E-Commerce, DeepTech Hardware, CleanTech, EdTech, Security, Logistics, Consumer Web). The dataset includes adversarial edge cases (e.g. 'Web3 Smart Mattress', 'Artisanal Organic Dirt Box Subscription') designed to test whether the system hallucinates market sizes for nonexistent products."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #14</span>
+        <div class="question">"How do you mathematically measure Faithfulness (Groundedness) in Layer 5?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"Faithfulness ($S_{\text{faith}}$) evaluates whether every numerical claim (TAM, CAGR, competitor metrics) is verbatim supported by retrieved source text:
+          <br>$$S_{\text{faith}} = \frac{|\text{Verified Factual Claims}|}{|\text{Total Generated Claims}|} \in [0.0, 1.0]$$
+          <br>Our deterministic regex fact-checking engine achieves <strong>95.8% Faithfulness</strong> (+29.3% uplift over raw zero-shot baselines at 66.4%)."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-arch">System Design #15</span>
+        <div class="question">"How does your 3-Tier Search Waterfall prevent SEO spam and unverified market numbers?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"When querying market data, the search engine enforces a strict domain authority whitelist:
+          <br>• <strong>Tier 0:</strong> Statista, Gartner, IDC, Grand View Research, PitchBook.
+          <br>• <strong>Tier 1:</strong> McKinsey, Bain, Bloomberg, TechCrunch, SEC 10-K Filings.
+          <br>• <strong>Tier 2:</strong> General Web Search.
+          <br>If Tier 0/1 sources return verifiable numbers, Tier 2 is bypassed. If no authoritative source exists, the engine marks the TAM as 'Data verification pending' rather than hallucinating an arbitrary market size."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-arch">System Design #16</span>
+        <div class="question">"How did you eliminate synthetic simulation from your evaluation harness?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"Early iterations contained simulated random metrics (`np.random.uniform(0.96, 1.00)`), which is unacceptable in production data science. We completely replaced that script with deterministic regex claim extraction, URL domain authority scoring, and adversarial concept stress-tests. The current 95.8% faithfulness and 91.8% context precision are empirical outputs serialized directly to <code>eval_benchmark_results.json</code>."</em></p>
+        </div>
+      </div>
+
+      <!-- PART F: BEHAVIORAL & RETROSPECTIVES -->
+      <h3>Part F: Behavioral, Production Retrospectives & Future Roadmap</h3>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-trap">Behavioral #17</span>
+        <div class="question">"Tell me about a time when your empirical data contradicted your initial intuition."</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"When performing EDA on the 189,970 startups, I assumed EdTech and Consumer Web would have reasonable survival rates due to low capital requirements. The empirical data showed the exact opposite: EdTech had the lowest baseline survival rate across all 12 sectors at only <strong>5.8%</strong>, while HealthTech (37.4%) and CleanTech (35.9%) had the highest. This taught me that low barriers to entry create hyper-saturated competitor cohorts with high failure rates, reinforcing why sector priors must be empirically grounded."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-trap">Behavioral #18</span>
+        <div class="question">"What was the single hardest engineering challenge you solved during this project?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"The hardest challenge was diagnosing and fixing the Target Definition Leakage. When our first model hit 0.9249 ROC-AUC, it felt like an instant success. But when I traced the feature importance, `funding_total_usd` dominated all splits. I investigated Crunchbase's target label logic and realized that companies raising $\ge \$5\text{M}$ were defined as successful by definition. It took discipline to throw away the 0.92 metric, purge all downstream variables, enforce strict Day-0 feature gating, and retrain a legitimate 0.8512 model that actually solves the customer's Day-0 problem."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-trap">Behavioral #19</span>
+        <div class="question">"If you had 3 months and $20,000 in GPU compute, what would you build for LaunchMint AI v2?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"Three strategic enhancements:
+          <br>1. <strong>Graph Neural Network (GNN) for Co-Investor Networks:</strong> Model investor syndicate co-investment graphs using PyTorch Geometric to calculate founder network centrality as a predictive feature.
+          <br>2. <strong>Survival Analysis with Censored Data:</strong> Transition from binary XGBoost classification to Cox Proportional Hazards or Gradient Boosted Survival Trees (Survival XGBoost) to model hazard rates over continuous time $S(t)$.
+          <br>3. <strong>Real-Time Financial API Integrations:</strong> Integrate live Stripe/Plaid sandbox webhooks to run continuous real-time Monte Carlo simulations directly on live founder MRR and burn feeds."</em></p>
+        </div>
+      </div>
+
+      <div class="qa-card">
+        <span class="qa-tag qa-tag-ds">Applied DS #20</span>
+        <div class="question">"How do the 4 DS pillars work together to provide an end-to-end investment brief?"</div>
+        <div class="answer">
+          <p><strong>The Grounded Defense:</strong> <em>"Each pillar answers a distinct mathematical question:
+          <br>• <strong>Predictive ML:</strong> 'What are the statistical survival odds on Day 0 based on historical venture cohorts?' (Day-0 XGBoost + SHAP).
+          <br>• <strong>Quantitative Modeling:</strong> 'What is the probability of insolvency within 12–36 months?' (Monte Carlo SDEs).
+          <br>• <strong>Aspect NLP:</strong> 'Where are incumbents structurally vulnerable in customer sentiment?' (VADER ABSA + CVI).
+          <br>• <strong>Grounding & Evaluation:</strong> 'Are our market projections verified by Tier-0 authoritative research?' (RAG Triad).
+          <br>Together, they form a cohesive, production-grade Applied Data Science platform."</em></p>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
