@@ -29,8 +29,11 @@ backend/logs/backend_logs.txt
 # --- Build & Distribution ---
 node_modules/
 bin/
-data/
-models/
+/data/
+backend/data/*.csv
+backend/data/processed/*.parquet
+!backend/data/processed/eval_benchmark_results.json
+!backend/data/eda_plots/
 build/
 dist/
 *.exe

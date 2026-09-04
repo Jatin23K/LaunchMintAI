@@ -667,6 +667,3 @@ const Skull = ({ className }: { className?: string }) => (
 );
 
 export default ValidatorApp;
-
-
-export default ValidatorApp;

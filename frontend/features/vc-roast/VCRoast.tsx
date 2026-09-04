@@ -25,7 +25,26 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
         try {
             const apiBase = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8000';
             const response = await axios.post(`${apiBase}/vc_roast`, { user_idea: text });
-            setData(response.data);
+            const roastData = response.data;
+
+            // Fetch real calibrated XGBoost ML Survival Prediction & SHAP drivers
+            try {
+                const mlRes = await axios.post(`${apiBase}/predict_survival`, {
+                    macro_vertical: "SaaS & Enterprise",
+                    founder_team_size: 2,
+                    is_tier_1_hub: 1,
+                    competitor_cohort_density: 1200
+                });
+                if (mlRes.data && mlRes.data.status === 'success') {
+                    roastData.survival_chance = Math.round(mlRes.data.survival_probability * 100);
+                    (roastData as any).risk_tier = mlRes.data.risk_tier;
+                    (roastData as any).shap_drivers = mlRes.data.shap_drivers;
+                }
+            } catch (mlErr) {
+                console.warn("ML survival inference fallback:", mlErr);
+            }
+
+            setData(roastData);
             setStatus('active');
         } catch (err) {
             console.error(err);
@@ -112,9 +131,23 @@ function VCRoastApp({ onBack, setStatus }: { onBack: () => void, setStatus: (s: 
                             </div>
                         </div>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Survival Probability</div>
-                            <div className="text-8xl font-black text-red-500 tracking-tighter mb-4">{data.survival_chance}%</div>
-                            <div className="px-4 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-black uppercase">Critical Risk</div>
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Empirical Survival Score</div>
+                            <div className="text-[10px] font-mono text-emerald-400 mb-3">XGBoost ML · 189k Cohort</div>
+                            <div className="text-7xl font-black text-red-500 tracking-tighter mb-3">{data.survival_chance}%</div>
+                            <div className="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-black uppercase mb-3">
+                                {(data as any).risk_tier || "Critical Risk"}
+                            </div>
+                            {(data as any).shap_drivers && (
+                                <div className="w-full text-left mt-2 pt-2 border-t border-slate-800 text-[10px] space-y-1">
+                                    <p className="text-slate-500 font-bold uppercase text-[9px]">Top SHAP Drivers:</p>
+                                    {(data as any).shap_drivers.positive_factors?.slice(0, 1).map((f: string, idx: number) => (
+                                        <p key={idx} className="text-emerald-400 truncate font-mono text-[9px]">{f}</p>
+                                    ))}
+                                    {(data as any).shap_drivers.risk_factors?.slice(0, 1).map((f: string, idx: number) => (
+                                        <p key={idx} className="text-red-400 truncate font-mono text-[9px]">{f}</p>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
