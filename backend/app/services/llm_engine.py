@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from app.services.market_search import search_market_data, format_search_results_for_prompt
 from app.services.database import create_db_and_tables
 from app.services.vector_db import get_semantic_cache, set_semantic_cache
+from app.models.schemas import IdeaRequest, VCRoastRequest, PitchForgeRequest
 
 load_dotenv()
 # ... (API_KEYS and MODELS remain the same)
