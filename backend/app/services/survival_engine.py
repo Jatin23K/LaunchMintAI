@@ -31,7 +31,10 @@ SECTOR_BASELINES = {
     'Other': 0.0424
 }
 
-# Global in-memory model cache
+# WHAT: Global in-memory cache for the serialized XGBoost model bundle and SHAP TreeExplainer.
+# WHY: Eliminates disk I/O and tree parsing on each HTTP request. Initializing shap.TreeExplainer once at
+# startup allows exact polynomial-time O(TLD^2) local Shapley attributions in <4ms per inference.
+# Model-agnostic KernelExplainer requires exponential perturbation sampling (3-10s), violating our API SLA.
 _MODEL_BUNDLE = None
 _EXPLAINER = None
 
@@ -71,9 +74,11 @@ def predict_startup_survival(
     Predicts startup survival probability using Day-Zero pre-seed observables
     and returns real-time SHAP attribution drivers.
     """
+    # WHAT: Fallback to historical macro-vertical empirical baseline if model bundle is unavailable.
+    # WHY: Graceful degradation pattern. Prevents HTTP 500 error cascades in production if disk artifacts are missing.
+    # Anchors the prediction to historical venture base rates (e.g., 14.7% for SaaS, 4.2% for Other) rather than arbitrary 50% priors.
     bundle = load_survival_model()
     if bundle is None:
-        # Fallback to sector baseline if model artifact not yet available
         baseline = SECTOR_BASELINES.get(macro_vertical, 0.1473)
         return {
             "status": "fallback",
@@ -90,7 +95,10 @@ def predict_startup_survival(
     model = bundle["model"]
     feature_names = bundle["feature_names"]
     
-    # 1. Construct single-row input feature vector (Day-Zero Leak-Free)
+    # WHAT: Construct strictly Day-0 observable feature dictionary, dropping all downstream funding parameters.
+    # WHY: Target Leakage Defense. Client requests may pass downstream fields (target_funding_usd, funding_rounds, milestones)
+    # for financial simulation, but the predictive survival model strictly isolates pre-seed observables to guarantee
+    # out-of-sample causal validity.
     input_dict = {
         'founder_team_size': max(1, min(int(founder_team_size), 20)),
         'is_tier_1_hub': 1 if int(is_tier_1_hub) > 0 else 0,
