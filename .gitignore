@@ -1,4 +1,4 @@
-# --- AI & Environment ---
+﻿# --- AI & Environment ---
 .claude/
 .venv/
 venv/
@@ -56,3 +56,10 @@ preparation.html
 # --- OS Specific ---
 .DS_Store
 Thumbs.db
+interview.html
+docs/interview.html
+Interview.md
+docs/Interview.md
+
+interview*.html
+*interview*prep*.html
