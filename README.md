@@ -10,6 +10,16 @@
 > **Applied Data Science & Machine Learning Platform**  
 > Validating Day-0 Pre-Seed Venture Concepts across 189,970 Historical Venture Cohorts with Leak-Free Predictive Modeling, Stochastic Differential Equations, and Deterministic RAG Triad Grounding.
 
+## Executive Problem & Engineering Solution
+
+* **The Problem It Kills:** Venture Runway Blindspots & Target Leakage in Survival Models.
+  * **The Reality:** 90% of startups die. Founders manage cash using static, linear Excel burn sheets that assume smooth sailing. They cannot model macroeconomic shocks, customer churn volatility, or funding droughts. Furthermore, published ML models for startup success suffer from massive target leakage (using future funding rounds to predict past survival).
+  * **How Naive Engineers Fail:** They train ML models on Crunchbase without temporal gates (creating fake 95% accuracy models that collapse on real Day-0 founders), or run slow Python loops for Monte Carlo that take minutes.
+  * **The Architectural Solution:** A Day-0 leak-free XGBoost model (`scale_pos_weight=9.11`, ROC-AUC 0.8512) that strictly purges downstream funding rounds, paired with a vectorized 2D NumPy SDE engine simulating 10,000 Geometric Brownian Motion market paths in parallel.
+  * **The Impact:** Simulates 10,000 stochastic market scenarios in **$< 32\text{ms}$** right inside a web request, calculating exact Probability of Ruin $P(\text{ruin} \le t)$ and 95% Value at Risk (VaR).
+
+---
+
 ---
 
 ## 📌 Executive Summary
