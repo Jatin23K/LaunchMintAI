@@ -56,10 +56,8 @@ preparation.html
 # --- OS Specific ---
 .DS_Store
 Thumbs.db
-
-# --- Offline Interview Preparation & OS Artifacts ---
+desktop.ini
 interview*.html
 *interview*
 *preparation*
 .git_backup*
-desktop.ini
